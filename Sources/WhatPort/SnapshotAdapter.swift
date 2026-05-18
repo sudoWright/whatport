@@ -40,6 +40,9 @@ enum SnapshotAdapter {
                     vconnCurrent: pwr.vconnCurrent
                 )
             },
+            ccData: snapshot.ccData.map { cc in
+                CCInput(portNumber: cc.portNumber, active: cc.active)
+            },
             powerMeteringAvailable: snapshot.powerMeteringAvailable
         )
     }

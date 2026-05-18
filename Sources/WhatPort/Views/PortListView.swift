@@ -15,7 +15,7 @@ struct PortListView: View {
                 listView
             }
         }
-        .frame(width: 300)
+        .frame(width: 320)
     }
 
     // MARK: - List View
@@ -39,29 +39,29 @@ struct PortListView: View {
     private var header: some View {
         HStack {
             Text("USB-C Ports")
-                .font(.system(.headline, design: .default))
+                .font(.headline)
             Spacer()
             if portManager.portCount > 0 {
                 Text("\(portManager.activePortCount)/\(portManager.portCount) active")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     private var emptyState: some View {
-        VStack(spacing: 6) {
-            Image(systemName: "cable.connector")
+        VStack(spacing: 8) {
+            Image(systemName: "bolt.horizontal")
                 .font(.title2)
                 .foregroundStyle(.tertiary)
             Text("Scanning ports...")
-                .font(.subheadline)
+                .font(.body)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        .padding(.vertical, 28)
     }
 
     private var portList: some View {
@@ -83,20 +83,20 @@ struct PortListView: View {
                 NSApplication.shared.terminate(nil)
             }
             .buttonStyle(.plain)
-            .font(.caption)
+            .font(.subheadline)
             .foregroundStyle(.secondary)
             Spacer()
             if let onSettings {
                 Button(action: onSettings) {
                     Image(systemName: "gear")
-                        .font(.caption)
+                        .font(.subheadline)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     // MARK: - Detail View
@@ -109,14 +109,14 @@ struct PortListView: View {
                         Image(systemName: "chevron.left")
                         Text("Back")
                     }
-                    .font(.caption)
+                    .font(.subheadline)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 Spacer()
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
 
             Divider()
 
@@ -137,32 +137,32 @@ struct PortRowView: View {
     var body: some View {
         HStack(spacing: 10) {
             protocolIndicator
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Port \(port.id)")
-                    .font(.system(.subheadline, weight: .medium))
+                    .font(.body.weight(.medium))
                 Text(summaryText)
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(port.isActive ? .secondary : .tertiary)
             }
             Spacer()
             if let power = port.power {
                 Text(formatWatts(power.watts))
-                    .font(.caption.monospacedDigit())
+                    .font(.subheadline.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
             Image(systemName: "chevron.right")
-                .font(.system(size: 10))
+                .font(.subheadline)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
         .opacity(port.isActive ? 1.0 : 0.5)
     }
 
     private var protocolIndicator: some View {
         Circle()
             .fill(indicatorColor)
-            .frame(width: 8, height: 8)
+            .frame(width: 10, height: 10)
     }
 
     private var indicatorColor: Color {
@@ -170,6 +170,7 @@ struct PortRowView: View {
         case .thunderbolt: return .purple
         case .displayPort: return .orange
         case .usbOnly: return .green
+        case .charging: return .yellow
         case .idle: return .gray.opacity(0.4)
         }
     }
@@ -185,6 +186,18 @@ struct PortRowView: View {
         if port.lane0.transport == .displayPort || port.lane1.transport == .displayPort {
             let dpLanes = [port.lane0, port.lane1].filter { $0.transport == .displayPort }.count
             return "DP alt-mode, \(dpLanes) lane\(dpLanes > 1 ? "s" : "")"
+        }
+
+        if port.lane0.transport == .usb || port.lane1.transport == .usb {
+            return "USB3"
+        }
+
+        if port.usb2Active {
+            return "USB2"
+        }
+
+        if port.ccConnected {
+            return "charging"
         }
 
         return "active"

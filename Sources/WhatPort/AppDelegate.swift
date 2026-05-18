@@ -15,6 +15,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
+        if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "png"),
+           let iconImage = NSImage(contentsOf: iconURL) {
+            NSApplication.shared.applicationIconImage = iconImage
+        }
 
         isSupported = HardwareCheck.isAppleSilicon()
 
@@ -37,10 +41,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         guard let button = statusItem?.button else { return }
 
-        button.image = NSImage(
-            systemSymbolName: "cable.connector",
-            accessibilityDescription: "WhatPort"
-        )
+        if let iconURL = Bundle.module.url(forResource: "MenuBarIcon", withExtension: "png") {
+            let image = NSImage(contentsOf: iconURL)
+            image?.isTemplate = true  // lets macOS handle light/dark mode
+            image?.size = NSSize(width: 18, height: 18)
+            button.image = image
+        }
         button.imagePosition = .imageLeading
         button.action = #selector(togglePopover)
         button.target = self
@@ -49,7 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupPopover() {
         let popover = NSPopover()
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 300, height: 200)
+        popover.contentSize = NSSize(width: 320, height: 200)
 
         if isSupported {
             popover.contentViewController = NSHostingController(
@@ -76,8 +82,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for await snapshot in stream {
                 let managerSnapshot = SnapshotAdapter.convert(snapshot)
                 portManager.applySnapshot(managerSnapshot)
+                let summary = portManager.ports.map { p in
+                    "P\(p.id):\(p.isActive ? "ON" : "off") L0=\(p.lane0.transport) L1=\(p.lane1.transport) cc=\(p.ccConnected)"
+                }.joined(separator: " | ")
+                debugLog("\(portManager.activePortCount)/\(portManager.portCount) active: \(summary)")
                 updateBadge()
             }
+            debugLog("stream ended")
         }
     }
 
@@ -126,6 +137,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow = window
+    }
+
+    private func debugLog(_ msg: String) {
+        let ts = ISO8601DateFormatter().string(from: Date())
+        let line = "[\(ts)] \(msg)\n"
+        let url = URL(fileURLWithPath: "/tmp/whatport-debug.log")
+        if let fh = try? FileHandle(forWritingTo: url) {
+            fh.seekToEndOfFile()
+            fh.write(line.data(using: .utf8)!)
+            fh.closeFile()
+        } else {
+            try? line.data(using: .utf8)?.write(to: url)
+        }
     }
 
     @objc private func togglePopover() {

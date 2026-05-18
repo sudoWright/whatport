@@ -17,6 +17,7 @@ public struct PortSnapshot: Sendable {
     public let phyData: [RawPhyData]
     public let thunderboltData: [RawThunderboltData]
     public let powerData: [RawPowerData]
+    public let ccData: [RawCCData]
     public let powerMeteringAvailable: Bool
 
     public init(
@@ -24,12 +25,14 @@ public struct PortSnapshot: Sendable {
         phyData: [RawPhyData] = [],
         thunderboltData: [RawThunderboltData] = [],
         powerData: [RawPowerData] = [],
+        ccData: [RawCCData] = [],
         powerMeteringAvailable: Bool = false
     ) {
         self.timestamp = timestamp
         self.phyData = phyData
         self.thunderboltData = thunderboltData
         self.powerData = powerData
+        self.ccData = ccData
         self.powerMeteringAvailable = powerMeteringAvailable
     }
 }
@@ -44,6 +47,7 @@ public enum SnapshotReader {
             phyData: PhyReader.readAll(),
             thunderboltData: ThunderboltReader.readAll(),
             powerData: PowerReader.readAll(),
+            ccData: CCReader.readAll(),
             powerMeteringAvailable: PowerReader.isPowerMeteringAvailable()
         )
     }

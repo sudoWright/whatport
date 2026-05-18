@@ -10,12 +10,15 @@ public struct PortState: Identifiable, Sendable {
     public var lane0: LaneState
     public var lane1: LaneState
     public var usb2Active: Bool
+    public var ccConnected: Bool
     public var thunderboltLink: ThunderboltLinkState?
     public var power: PortPower?
     public var deviceName: String?
 
+    // A port is active if any data transport is running or something is
+    // physically connected on the CC line (e.g. a charger).
     public var isActive: Bool {
-        lane0.transport != .idle || lane1.transport != .idle
+        lane0.transport != .idle || lane1.transport != .idle || usb2Active || ccConnected
     }
 
     public var primaryProtocol: PortProtocol {
@@ -23,8 +26,11 @@ public struct PortState: Identifiable, Sendable {
         if lane0.transport == .displayPort || lane1.transport == .displayPort {
             return .displayPort
         }
-        if usb2Active && !isActive { return .usbOnly }
-        if isActive { return .thunderbolt }
+        if lane0.transport == .usb || lane1.transport == .usb || usb2Active {
+            return .usbOnly
+        }
+        // CC connected but no data lanes = power-only (charger)
+        if ccConnected { return .charging }
         return .idle
     }
 
@@ -33,6 +39,7 @@ public struct PortState: Identifiable, Sendable {
         lane0: LaneState = .idle,
         lane1: LaneState = .idle,
         usb2Active: Bool = false,
+        ccConnected: Bool = false,
         thunderboltLink: ThunderboltLinkState? = nil,
         power: PortPower? = nil,
         deviceName: String? = nil
@@ -41,6 +48,7 @@ public struct PortState: Identifiable, Sendable {
         self.lane0 = lane0
         self.lane1 = lane1
         self.usb2Active = usb2Active
+        self.ccConnected = ccConnected
         self.thunderboltLink = thunderboltLink
         self.power = power
         self.deviceName = deviceName
@@ -66,6 +74,7 @@ public struct LaneState: Sendable, Equatable {
 public enum LaneTransport: Sendable, Equatable {
     case thunderbolt
     case displayPort
+    case usb
     case idle
 }
 
@@ -168,5 +177,6 @@ public enum PortProtocol: Sendable, Equatable {
     case thunderbolt
     case displayPort
     case usbOnly
+    case charging
     case idle
 }

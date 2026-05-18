@@ -71,7 +71,21 @@ public final class LivePortDataSource: @unchecked Sendable, PortDataSource {
 
     private func yieldSnapshot() {
         let snapshot = SnapshotReader.takeSnapshot()
+        debugLog("snapshot: \(snapshot.phyData.count) PHY, \(snapshot.thunderboltData.count) TB, \(snapshot.powerData.count) power")
         continuation?.yield(snapshot)
+    }
+
+    private func debugLog(_ msg: String) {
+        let ts = ISO8601DateFormatter().string(from: Date())
+        let line = "[\(ts)] \(msg)\n"
+        let url = URL(fileURLWithPath: "/tmp/whatport-debug.log")
+        if let fh = try? FileHandle(forWritingTo: url) {
+            fh.seekToEndOfFile()
+            fh.write(line.data(using: .utf8)!)
+            fh.closeFile()
+        } else {
+            try? line.data(using: .utf8)?.write(to: url)
+        }
     }
 
     private func startPowerPoll() {

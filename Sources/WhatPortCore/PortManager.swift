@@ -28,7 +28,8 @@ public final class PortManager: @unchecked Sendable {
         let correlated = correlate(
             phyData: snapshot.phyData,
             tbData: snapshot.tbData,
-            powerData: snapshot.powerData
+            powerData: snapshot.powerData,
+            ccData: snapshot.ccData
         )
 
         if portCount == 0 {
@@ -64,6 +65,7 @@ public struct PortManagerSnapshot: Sendable {
     public let phyData: [PhyInput]
     public let tbData: [ThunderboltInput]
     public let powerData: [PowerInput]
+    public let ccData: [CCInput]
     public let powerMeteringAvailable: Bool
 
     public init(
@@ -71,13 +73,25 @@ public struct PortManagerSnapshot: Sendable {
         phyData: [PhyInput] = [],
         tbData: [ThunderboltInput] = [],
         powerData: [PowerInput] = [],
+        ccData: [CCInput] = [],
         powerMeteringAvailable: Bool = false
     ) {
         self.timestamp = timestamp
         self.phyData = phyData
         self.tbData = tbData
         self.powerData = powerData
+        self.ccData = ccData
         self.powerMeteringAvailable = powerMeteringAvailable
+    }
+}
+
+public struct CCInput: Sendable {
+    public let portNumber: Int
+    public let active: Bool
+
+    public init(portNumber: Int, active: Bool) {
+        self.portNumber = portNumber
+        self.active = active
     }
 }
 
@@ -183,10 +197,14 @@ extension PortManager {
     private func correlate(
         phyData: [PhyInput],
         tbData: [ThunderboltInput],
-        powerData: [PowerInput]
+        powerData: [PowerInput],
+        ccData: [CCInput]
     ) -> [PortState] {
         // Deduplicate TB data by socket ID (multiple adapters per port, take best)
         let tbBySocket = bestTBPerSocket(tbData)
+
+        // Build CC lookup by port number
+        let ccByPort = Dictionary(ccData.map { ($0.portNumber, $0.active) }, uniquingKeysWith: { a, _ in a })
 
         // Get unique socket IDs sorted (these are our physical ports)
         let socketIDs = tbBySocket.keys.sorted()
@@ -194,11 +212,13 @@ extension PortManager {
         // If no TB data, fall back to PHY IDs as port numbers
         if socketIDs.isEmpty {
             return phyData.map { phy in
-                buildPortState(
-                    portID: phy.phyID + 1,
+                let portID = phy.phyID + 1
+                return buildPortState(
+                    portID: portID,
                     phy: phy,
                     tb: nil,
-                    power: powerData.first { $0.portIndex == phy.phyID + 1 }
+                    power: powerData.first { $0.portIndex == portID },
+                    ccActive: ccByPort[portID] ?? false
                 )
             }
         }
@@ -215,7 +235,8 @@ extension PortManager {
                 portID: socketID,
                 phy: phy,
                 tb: tb,
-                power: power
+                power: power,
+                ccActive: ccByPort[socketID] ?? false
             ))
         }
 
@@ -243,7 +264,8 @@ extension PortManager {
         portID: Int,
         phy: PhyInput?,
         tb: ThunderboltInput?,
-        power: PowerInput?
+        power: PowerInput?,
+        ccActive: Bool
     ) -> PortState {
         let lane0 = parseLane(transport: phy?.lane0Transport, powerLevel: phy?.lane0PowerLevel, client: phy?.lane0Client)
         let lane1 = parseLane(transport: phy?.lane1Transport, powerLevel: phy?.lane1PowerLevel, client: phy?.lane1Client)
@@ -277,6 +299,7 @@ extension PortManager {
             lane0: lane0,
             lane1: lane1,
             usb2Active: usb2Active,
+            ccConnected: ccActive,
             thunderboltLink: tbLink,
             power: portPower
         )
@@ -288,6 +311,7 @@ extension PortManager {
         switch t.lowercased() {
         case "cio": laneTransport = .thunderbolt
         case "displayport": laneTransport = .displayPort
+        case "usb3": laneTransport = .usb
         default: laneTransport = .idle
         }
 

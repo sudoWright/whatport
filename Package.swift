@@ -26,7 +26,11 @@ let package = Package(
             name: "WhatPort",
             dependencies: ["WhatPortCore", "WhatPortIOKit"],
             path: "Sources/WhatPort",
-            exclude: ["Resources"]
+            resources: [
+                .copy("Resources/AppIcon.png"),
+                .copy("Resources/MenuBarIcon.png"),
+                .copy("Resources/MenuBarIcon@2x.png")
+            ]
         ),
         .testTarget(
             name: "WhatPortCoreTests",

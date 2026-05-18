@@ -22,8 +22,8 @@ struct PortDetailView: View {
                 deviceSection(name: name)
             }
         }
-        .padding(14)
-        .frame(width: 300)
+        .padding(16)
+        .frame(width: 320)
     }
 
     // MARK: - Header
@@ -37,7 +37,7 @@ struct PortDetailView: View {
                 .font(.headline)
             Spacer()
             Text(protocolLabel)
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
     }
@@ -47,6 +47,7 @@ struct PortDetailView: View {
         case .thunderbolt: return .purple
         case .displayPort: return .orange
         case .usbOnly: return .green
+        case .charging: return .yellow
         case .idle: return .gray.opacity(0.4)
         }
     }
@@ -60,6 +61,7 @@ struct PortDetailView: View {
             return "Thunderbolt"
         case .displayPort: return "DisplayPort"
         case .usbOnly: return "USB"
+        case .charging: return "Charging"
         case .idle: return "idle"
         }
     }
@@ -69,7 +71,7 @@ struct PortDetailView: View {
     private var laneDiagram: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Lanes")
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(.tertiary)
             LaneBar(label: "Lane 0", state: port.lane0, tbLink: port.thunderboltLink)
             LaneBar(label: "Lane 1", state: port.lane1, tbLink: port.thunderboltLink)
@@ -82,7 +84,7 @@ struct PortDetailView: View {
     private var powerSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Power")
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(.tertiary)
 
             if let power = port.power {
@@ -90,7 +92,7 @@ struct PortDetailView: View {
                     Text(String(format: "%.1fW", power.watts))
                         .font(.system(.title3, design: .rounded, weight: .medium))
                     Text("(\(power.current) mA @ \(power.voltage) mV)")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 HStack(spacing: 12) {
@@ -107,11 +109,11 @@ struct PortDetailView: View {
                 }
             } else if !powerMeteringAvailable {
                 Text("Power metering unavailable on this hardware")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.tertiary)
             } else {
                 Text("Not sourcing power")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.tertiary)
             }
         }
@@ -136,7 +138,7 @@ struct PortDetailView: View {
                     AxisValueLabel {
                         if let w = value.as(Double.self) {
                             Text(String(format: "%.0fW", w))
-                                .font(.system(size: 9))
+                                .font(.system(size: 11))
                         }
                     }
                 }
@@ -145,7 +147,7 @@ struct PortDetailView: View {
             .overlay {
                 if !port.isActive && !powerHistory.isEmpty {
                     Text("disconnected")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -157,10 +159,10 @@ struct PortDetailView: View {
     private func deviceSection(name: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Connected")
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(.tertiary)
             Text(name)
-                .font(.subheadline)
+                .font(.body)
         }
     }
 }
@@ -175,23 +177,23 @@ struct LaneBar: View {
     var body: some View {
         HStack(spacing: 6) {
             Text(label)
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .frame(width: 42, alignment: .trailing)
+                .frame(width: 48, alignment: .trailing)
 
             RoundedRectangle(cornerRadius: 3)
                 .fill(barColor)
-                .frame(height: 14)
+                .frame(height: 18)
                 .overlay {
                     Text(barLabel)
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white)
                 }
 
             Text(speedLabel)
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(.tertiary)
-                .frame(width: 60, alignment: .leading)
+                .frame(width: 70, alignment: .leading)
         }
     }
 
@@ -199,6 +201,7 @@ struct LaneBar: View {
         switch state.transport {
         case .thunderbolt: return .purple
         case .displayPort: return .orange
+        case .usb: return .green
         case .idle: return .gray.opacity(0.15)
         }
     }
@@ -207,6 +210,7 @@ struct LaneBar: View {
         switch state.transport {
         case .thunderbolt: return "CIO"
         case .displayPort: return "DisplayPort"
+        case .usb: return "USB3"
         case .idle: return ""
         }
     }
@@ -220,6 +224,8 @@ struct LaneBar: View {
             return ""
         case .displayPort:
             return "DP"
+        case .usb:
+            return "5 Gbps"
         case .idle:
             return ""
         }
@@ -232,23 +238,23 @@ struct USB2Bar: View {
     var body: some View {
         HStack(spacing: 6) {
             Text("USB2")
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .frame(width: 42, alignment: .trailing)
+                .frame(width: 48, alignment: .trailing)
 
             RoundedRectangle(cornerRadius: 3)
                 .fill(active ? Color.green.opacity(0.7) : Color.gray.opacity(0.15))
-                .frame(height: 14)
+                .frame(height: 18)
                 .overlay {
                     if active {
                         Text("active")
-                            .font(.system(size: 9, weight: .medium))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.white)
                     }
                 }
 
             Text("")
-                .frame(width: 60)
+                .frame(width: 70)
         }
     }
 }
@@ -262,10 +268,10 @@ struct LabeledValue: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label)
-                .font(.system(size: 9))
+                .font(.caption)
                 .foregroundStyle(.tertiary)
             Text(value)
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
     }
