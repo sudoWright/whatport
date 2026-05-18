@@ -32,8 +32,11 @@ public final class PortManager: @unchecked Sendable {
             ccData: snapshot.ccData
         )
 
+        // portCount tracks USB-C ports only (stable count from hardware).
+        // MagSafe and other non-USB-C ports are dynamic and excluded.
+        let usbCPorts = correlated.filter { $0.portType == .usbC }
         if portCount == 0 {
-            portCount = correlated.count
+            portCount = usbCPorts.count
         }
 
         ports = correlated
@@ -51,7 +54,7 @@ public final class PortManager: @unchecked Sendable {
     }
 
     public var activePortCount: Int {
-        ports.filter(\.isActive).count
+        ports.filter { $0.isActive && $0.portType == .usbC }.count
     }
 }
 
@@ -87,10 +90,12 @@ public struct PortManagerSnapshot: Sendable {
 
 public struct CCInput: Sendable {
     public let portNumber: Int
+    public let portType: String   // "USB-C", "MagSafe 3", etc.
     public let active: Bool
 
-    public init(portNumber: Int, active: Bool) {
+    public init(portNumber: Int, portType: String = "USB-C", active: Bool) {
         self.portNumber = portNumber
+        self.portType = portType
         self.active = active
     }
 }
@@ -221,15 +226,20 @@ extension PortManager {
         let dedupedPhys = bestPhyPerPort(phyData)
         let hasDirectMapping = dedupedPhys.contains { $0.portNumber > 0 }
 
-        // Build CC lookup by port number
-        let ccByPort = Dictionary(ccData.map { ($0.portNumber, $0.active) }, uniquingKeysWith: { a, _ in a })
+        // Separate USB-C CC data from non-USB-C (MagSafe, etc.)
+        // They can share the same ParentBuiltInPortNumber, so we must
+        // not let MagSafe's state bleed into USB-C port matching.
+        let usbCCC = ccData.filter { $0.portType == "USB-C" }
+        let nonUSBCCC = ccData.filter { $0.portType != "USB-C" && $0.portType != "" }
+
+        let ccByPort = Dictionary(usbCCC.map { ($0.portNumber, $0.active) }, uniquingKeysWith: { a, _ in a })
 
         // Get unique socket IDs sorted (these are our physical ports)
         let socketIDs = tbBySocket.keys.sorted()
 
         // If no TB data, use PHY port numbers (or PHY IDs + 1 as fallback)
         if socketIDs.isEmpty {
-            return dedupedPhys.map { phy in
+            var results = dedupedPhys.map { phy in
                 let portID = phy.portNumber > 0 ? phy.portNumber : (phy.phyID + 1)
                 return buildPortState(
                     portID: portID,
@@ -239,6 +249,8 @@ extension PortManager {
                     ccActive: ccByPort[portID] ?? false
                 )
             }
+            results.append(contentsOf: buildNonUSBCPorts(nonUSBCCC))
+            return results
         }
 
         // Build PHY lookup for direct mapping
@@ -273,6 +285,9 @@ extension PortManager {
                 ccActive: ccByPort[socketID] ?? false
             ))
         }
+
+        // Append non-USB-C ports (MagSafe, etc.) at the end
+        results.append(contentsOf: buildNonUSBCPorts(nonUSBCCC))
 
         return results
     }
@@ -321,6 +336,21 @@ extension PortManager {
             let a = $0.portNumber > 0 ? $0.portNumber : $0.phyID
             let b = $1.portNumber > 0 ? $1.portNumber : $1.phyID
             return a < b
+        }
+    }
+
+    // Build port entries for non-USB-C connectors (MagSafe, etc.)
+    // These only have CC data, no PHY or TB. They use IDs starting at
+    // 100 to avoid colliding with USB-C socket IDs.
+    private func buildNonUSBCPorts(_ ccEntries: [CCInput]) -> [PortState] {
+        ccEntries.compactMap { cc in
+            guard cc.active else { return nil }
+            let portType: PortType = cc.portType.lowercased().contains("magsafe") ? .magSafe : .usbC
+            return PortState(
+                id: 100 + cc.portNumber,
+                portType: portType,
+                ccConnected: true
+            )
         }
     }
 

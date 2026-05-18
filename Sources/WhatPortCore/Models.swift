@@ -7,6 +7,7 @@ import Foundation
 
 public struct PortState: Identifiable, Sendable {
     public let id: Int
+    public var portType: PortType
     public var lane0: LaneState
     public var lane1: LaneState
     public var usb2Active: Bool
@@ -29,13 +30,14 @@ public struct PortState: Identifiable, Sendable {
         if lane0.transport == .usb || lane1.transport == .usb || usb2Active {
             return .usbOnly
         }
-        // CC connected but no data lanes = power-only (charger)
+        // CC connected but no data lanes = power-only (charger/MagSafe)
         if ccConnected { return .charging }
         return .idle
     }
 
     public init(
         id: Int,
+        portType: PortType = .usbC,
         lane0: LaneState = .idle,
         lane1: LaneState = .idle,
         usb2Active: Bool = false,
@@ -45,6 +47,7 @@ public struct PortState: Identifiable, Sendable {
         deviceName: String? = nil
     ) {
         self.id = id
+        self.portType = portType
         self.lane0 = lane0
         self.lane1 = lane1
         self.usb2Active = usb2Active
@@ -172,6 +175,20 @@ public struct PortPower: Sendable, Equatable {
         self.configuredVoltage = configuredVoltage
         self.configuredCurrent = configuredCurrent
         self.vconnCurrent = vconnCurrent
+    }
+}
+
+// MARK: - Port Type (physical connector)
+
+public enum PortType: Sendable, Equatable {
+    case usbC
+    case magSafe
+
+    public var label: String {
+        switch self {
+        case .usbC: return "USB-C"
+        case .magSafe: return "MagSafe"
+        }
     }
 }
 

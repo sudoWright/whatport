@@ -1,36 +1,40 @@
 import Foundation
 import IOKit
 
-// Reads USB-C CC (communication channel) connection state.
+// Reads CC (communication channel) connection state from all port types.
 //
-// Each USB-C port has an IOPortTransportStateCC service. Its "Active"
-// property indicates whether anything is physically connected to the
-// port, even if there's no data transport (e.g. a power-only charger).
+// Each port (USB-C, MagSafe, etc.) has an IOPortTransportStateCC service.
+// Its "Active" property indicates whether anything is physically connected.
 //
-// We use ParentBuiltInPortNumber to map each CC service to its
-// physical port number.
+// ParentBuiltInPortNumber maps each CC service to its physical port, but
+// different port types can share the same number (e.g. MagSafe and USB-C
+// port 1 both report ParentBuiltInPortNumber = 1). We use
+// ParentPortTypeDescription to distinguish them.
 
 public struct RawCCData: Sendable {
     public let portNumber: Int
+    public let portType: String   // "USB-C", "MagSafe 3", etc.
     public let active: Bool
 }
 
 public enum CCReader {
     public static func readAll() -> [RawCCData] {
         var results: [RawCCData] = []
-        var seen = Set<Int>()
+        // Dedup key: (portNumber, portType) since different types share numbers
+        var seen = Set<String>()
 
         withMatchingServices(className: "IOPortTransportStateCC") { service in
             guard let props = ioProperties(service) else { return }
 
             let portNumber = ioInt(props["ParentBuiltInPortNumber"])
+            let portType = ioString(props["ParentPortTypeDescription"])
             let active = ioBool(props["Active"])
 
-            // Deduplicate by port number (some ports have multiple CC entries)
-            guard portNumber > 0, !seen.contains(portNumber) else { return }
-            seen.insert(portNumber)
+            let key = "\(portNumber):\(portType)"
+            guard portNumber > 0, !seen.contains(key) else { return }
+            seen.insert(key)
 
-            results.append(RawCCData(portNumber: portNumber, active: active))
+            results.append(RawCCData(portNumber: portNumber, portType: portType, active: active))
         }
 
         return results.sorted { $0.portNumber < $1.portNumber }

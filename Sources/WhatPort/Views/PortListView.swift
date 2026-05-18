@@ -38,7 +38,7 @@ struct PortListView: View {
 
     private var header: some View {
         HStack {
-            Text("USB-C Ports")
+            Text("Ports")
                 .font(.headline)
             Spacer()
             if portManager.portCount > 0 {
@@ -138,7 +138,7 @@ struct PortRowView: View {
         HStack(spacing: 10) {
             protocolIndicator
             VStack(alignment: .leading, spacing: 2) {
-                Text("Port \(port.id)")
+                Text(portLabel)
                     .font(.body.weight(.medium))
                 Text(summaryText)
                     .font(.subheadline)
@@ -157,6 +157,13 @@ struct PortRowView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .opacity(port.isActive ? 1.0 : 0.5)
+    }
+
+    private var portLabel: String {
+        switch port.portType {
+        case .magSafe: return "MagSafe"
+        case .usbC: return "Port \(port.id)"
+        }
     }
 
     private var protocolIndicator: some View {

@@ -42,7 +42,7 @@ enum SnapshotAdapter {
                 )
             },
             ccData: snapshot.ccData.map { cc in
-                CCInput(portNumber: cc.portNumber, active: cc.active)
+                CCInput(portNumber: cc.portNumber, portType: cc.portType, active: cc.active)
             },
             powerMeteringAvailable: snapshot.powerMeteringAvailable
         )

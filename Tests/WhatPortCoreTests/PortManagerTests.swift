@@ -209,3 +209,49 @@ import Testing
     #expect(manager.ports.count == 1)
     #expect(manager.ports[0].lane0.transport == .thunderbolt) // got the active PHY
 }
+
+// MagSafe and USB-C port 1 share ParentBuiltInPortNumber = 1.
+// MagSafe must not pollute USB-C port state, and should appear as its own entry.
+@Test func portManagerSeparatesMagSafeFromUSBC() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        phyData: [
+            PhyInput(phyID: 0, portNumber: 1),
+            PhyInput(phyID: 1, portNumber: 2)
+        ],
+        tbData: [
+            ThunderboltInput(socketID: 1),
+            ThunderboltInput(socketID: 2)
+        ],
+        ccData: [
+            CCInput(portNumber: 1, portType: "USB-C", active: false),
+            CCInput(portNumber: 2, portType: "USB-C", active: true),
+            CCInput(portNumber: 1, portType: "MagSafe 3", active: true)
+        ]
+    )
+
+    manager.applySnapshot(snapshot)
+
+    // 2 USB-C ports + 1 MagSafe = 3 total
+    #expect(manager.ports.count == 3)
+
+    // USB-C port 1: CC inactive (not contaminated by MagSafe)
+    let usbcPort1 = manager.ports[0]
+    #expect(usbcPort1.id == 1)
+    #expect(usbcPort1.portType == .usbC)
+    #expect(!usbcPort1.ccConnected)
+    #expect(!usbcPort1.isActive)
+
+    // USB-C port 2: CC active
+    let usbcPort2 = manager.ports[1]
+    #expect(usbcPort2.id == 2)
+    #expect(usbcPort2.ccConnected)
+
+    // MagSafe: shown as its own port, active
+    let magSafe = manager.ports[2]
+    #expect(magSafe.portType == .magSafe)
+    #expect(magSafe.ccConnected)
+    #expect(magSafe.isActive)
+    #expect(magSafe.primaryProtocol == .charging)
+}
