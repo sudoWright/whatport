@@ -6,40 +6,15 @@ struct PortDetailView: View {
     let port: PortState
     let powerHistory: [PowerSample]
     let powerMeteringAvailable: Bool
+    var isCharging: Bool = false
+    var fullyCharged: Bool = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 header
                 Divider()
-
-                if let device = port.usbDevice {
-                    deviceSection(device)
-                    Divider()
-                }
-
-                laneDiagram
-                Divider()
-
-                powerSection
-                if !powerHistory.isEmpty {
-                    powerChart
-                }
-
-                if let tb = port.thunderboltCapability {
-                    Divider()
-                    thunderboltSection(capability: tb, link: port.thunderboltLink)
-                }
-
-                if let cable = port.cable {
-                    Divider()
-                    cableSection(cable)
-                }
-
-                if let stats = port.portStats {
-                    Divider()
-                    statsSection(stats)
-                }
+                cardContent
             }
             .padding(16)
         }
@@ -88,8 +63,70 @@ struct PortDetailView: View {
             return "Thunderbolt"
         case .displayPort: return "DisplayPort"
         case .usbOnly: return "USB"
-        case .charging: return "Charging"
+        case .charging:
+            if fullyCharged { return "Battery Full" }
+            if isCharging { return "Charging" }
+            return "Charger Connected"
         case .idle: return "idle"
+        }
+    }
+
+    // MARK: - Card Content (protocol-specific ordering)
+
+    @ViewBuilder
+    private var cardContent: some View {
+        switch port.primaryProtocol {
+        case .charging:
+            powerSection
+            if !powerHistory.isEmpty { powerChart }
+            laneDiagram
+            if let cap = port.thunderboltCapability {
+                thunderboltSection(capability: cap, link: port.thunderboltLink)
+            }
+            if let cable = port.cable { cableSection(cable) }
+            if let stats = port.portStats { statsSection(stats) }
+
+        case .usbOnly:
+            if let device = port.usbDevice { deviceSection(device) }
+            powerSection
+            if !powerHistory.isEmpty { powerChart }
+            laneDiagram
+            if let cap = port.thunderboltCapability {
+                thunderboltSection(capability: cap, link: port.thunderboltLink)
+            }
+            if let cable = port.cable { cableSection(cable) }
+            if let stats = port.portStats { statsSection(stats) }
+
+        case .thunderbolt:
+            if let device = port.usbDevice { deviceSection(device) }
+            if let cap = port.thunderboltCapability {
+                thunderboltSection(capability: cap, link: port.thunderboltLink)
+            }
+            laneDiagram
+            powerSection
+            if !powerHistory.isEmpty { powerChart }
+            if let cable = port.cable { cableSection(cable) }
+            if let stats = port.portStats { statsSection(stats) }
+
+        case .displayPort:
+            if let device = port.usbDevice { deviceSection(device) }
+            laneDiagram
+            powerSection
+            if !powerHistory.isEmpty { powerChart }
+            if let cap = port.thunderboltCapability {
+                thunderboltSection(capability: cap, link: port.thunderboltLink)
+            }
+            if let cable = port.cable { cableSection(cable) }
+            if let stats = port.portStats { statsSection(stats) }
+
+        case .idle:
+            laneDiagram
+            if let cap = port.thunderboltCapability {
+                thunderboltSection(capability: cap, link: port.thunderboltLink)
+            }
+            powerSection
+            if !powerHistory.isEmpty { powerChart }
+            if let stats = port.portStats { statsSection(stats) }
         }
     }
 

@@ -127,7 +127,9 @@ struct PortListView: View {
             PortDetailView(
                 port: port,
                 powerHistory: portManager.powerHistory[port.id] ?? [],
-                powerMeteringAvailable: portManager.powerMeteringAvailable
+                powerMeteringAvailable: portManager.powerMeteringAvailable,
+                isCharging: portManager.isCharging,
+                fullyCharged: portManager.fullyCharged
             )
         }
     }
