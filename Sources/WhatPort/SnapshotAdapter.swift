@@ -11,6 +11,7 @@ enum SnapshotAdapter {
             phyData: snapshot.phyData.map { phy in
                 PhyInput(
                     phyID: phy.phyID,
+                    portNumber: phy.portNumber,
                     lane0Transport: phy.lane0Transport,
                     lane0PowerLevel: phy.lane0PowerLevel,
                     lane0Client: phy.lane0Client,

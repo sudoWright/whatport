@@ -120,3 +120,92 @@ import Testing
     #expect(manager.ports.count == 1)
     #expect(manager.ports[0].thunderboltLink?.txLanes == 2) // picked the wider one
 }
+
+// Mirrors real M4 Pro hardware: 4 PHYs, 3 ports.
+// PHY 0 and PHY 2 both map to port 1. PHY 2 is idle, PHY 0 is active.
+// Without direct mapping, positional logic would wrongly assign PHY 2 to port 4.
+@Test func portManagerUsesDirectPhyToPortMapping() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        phyData: [
+            PhyInput(phyID: 0, portNumber: 1, lane0Transport: "USB3", lane0PowerLevel: "on"),
+            PhyInput(phyID: 1, portNumber: 2, lane0Transport: "DisplayPort", lane0PowerLevel: "on"),
+            PhyInput(phyID: 2, portNumber: 1), // duplicate port 1, idle
+            PhyInput(phyID: 3, portNumber: 4)
+        ],
+        tbData: [
+            ThunderboltInput(socketID: 1),
+            ThunderboltInput(socketID: 2),
+            ThunderboltInput(socketID: 4)
+        ]
+    )
+
+    manager.applySnapshot(snapshot)
+
+    // Should have 3 ports (from TB socket IDs), not 4
+    #expect(manager.ports.count == 3)
+
+    // Port 1: should get PHY 0's USB3 data (active wins over PHY 2's idle)
+    let port1 = manager.ports[0]
+    #expect(port1.id == 1)
+    #expect(port1.lane0.transport == .usb)
+
+    // Port 2: should get PHY 1's DisplayPort data
+    let port2 = manager.ports[1]
+    #expect(port2.id == 2)
+    #expect(port2.lane0.transport == .displayPort)
+
+    // Port 4: should get PHY 3's idle data (not PHY 2)
+    let port3 = manager.ports[2]
+    #expect(port3.id == 4)
+    #expect(!port3.isActive)
+}
+
+// When port-number is not available (0), fall back to positional mapping.
+// This is the legacy behavior for machines where device tree doesn't
+// expose port-number on atc-phy nodes.
+@Test func portManagerFallsBackToPositionalMapping() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        phyData: [
+            PhyInput(phyID: 0, lane0Transport: "CIO", lane0PowerLevel: "on"),
+            PhyInput(phyID: 1)
+        ],
+        tbData: [
+            ThunderboltInput(socketID: 1, currentLinkWidth: 2, currentLinkSpeed: 4),
+            ThunderboltInput(socketID: 2)
+        ]
+    )
+
+    manager.applySnapshot(snapshot)
+
+    #expect(manager.ports.count == 2)
+    // Positional: PHY 0 -> socket 1, PHY 1 -> socket 2
+    #expect(manager.ports[0].id == 1)
+    #expect(manager.ports[0].lane0.transport == .thunderbolt)
+    #expect(manager.ports[1].id == 2)
+    #expect(!manager.ports[1].isActive)
+}
+
+// When duplicate PHYs map to the same port, the one with active transport
+// should be selected, regardless of phyID order.
+@Test func portManagerDedupPicksActivePhy() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        phyData: [
+            PhyInput(phyID: 0, portNumber: 1), // idle
+            PhyInput(phyID: 2, portNumber: 1, lane0Transport: "CIO", lane0PowerLevel: "on") // active
+        ],
+        tbData: [
+            ThunderboltInput(socketID: 1, currentLinkWidth: 2, currentLinkSpeed: 4)
+        ]
+    )
+
+    manager.applySnapshot(snapshot)
+
+    #expect(manager.ports.count == 1)
+    #expect(manager.ports[0].lane0.transport == .thunderbolt) // got the active PHY
+}

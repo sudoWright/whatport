@@ -12,6 +12,9 @@ import IOKit
 
 public struct RawPhyData: Sendable {
     public let phyID: Int
+    // Physical port number from the parent atc-phy device tree node.
+    // 0 means the property wasn't found (older macOS or different hardware).
+    public let portNumber: Int
     public let lane0Transport: String
     public let lane0PowerLevel: String
     public let lane0Client: String
@@ -37,6 +40,13 @@ public enum PhyReader {
 
             let phyID = ioInt(props["AppleTypeCPhyID"])
 
+            // Read port-number from the parent atc-phy device tree node.
+            // This is the direct hardware mapping from PHY controller to
+            // physical USB-C port. It's more reliable than positional mapping
+            // because some Macs have more PHY controllers than physical ports
+            // (e.g. M4 Pro has 4 PHYs for 3 ports).
+            let portNumber = ioDataInt(ioParentProperty(service, key: "port-number")) ?? 0
+
             // Lane data is nested: "AppleTypeCPhyLane" -> "Lane 0" -> "Transport"
             let lanes = ioDictionary(props["AppleTypeCPhyLane"])
             let lane0 = ioDictionary(lanes["Lane 0"])
@@ -51,6 +61,7 @@ public enum PhyReader {
 
             let data = RawPhyData(
                 phyID: phyID,
+                portNumber: portNumber,
                 lane0Transport: ioString(lane0["Transport"]),
                 lane0PowerLevel: ioString(lane0["Power Level"]),
                 lane0Client: ioString(lane0["Client"]),

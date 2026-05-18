@@ -97,6 +97,10 @@ public struct CCInput: Sendable {
 
 public struct PhyInput: Sendable {
     public let phyID: Int
+    // Direct port mapping from the device tree. 0 means unavailable.
+    // When present, this is used instead of positional mapping to
+    // correlate PHY data with Thunderbolt socket IDs.
+    public let portNumber: Int
     public let lane0Transport: String
     public let lane0PowerLevel: String
     public let lane0Client: String
@@ -107,6 +111,7 @@ public struct PhyInput: Sendable {
 
     public init(
         phyID: Int,
+        portNumber: Int = 0,
         lane0Transport: String = "",
         lane0PowerLevel: String = "",
         lane0Client: String = "",
@@ -116,6 +121,7 @@ public struct PhyInput: Sendable {
         usb2Transport: String = ""
     ) {
         self.phyID = phyID
+        self.portNumber = portNumber
         self.lane0Transport = lane0Transport
         self.lane0PowerLevel = lane0PowerLevel
         self.lane0Client = lane0Client
@@ -192,8 +198,16 @@ extension PortManager {
     // to build a unified PortState per physical port.
     //
     // The key insight: IOThunderboltPort's Socket ID = physical port number.
-    // We use Socket ID as the canonical port identifier, then match PHY data
-    // by position (PhyID order maps to Socket ID order on tested hardware).
+    // We use Socket ID as the canonical port identifier.
+    //
+    // PHY-to-port mapping uses two strategies:
+    // 1. Direct: if PHY data has portNumber (from the parent atc-phy device
+    //    tree node), match portNumber to socketID. Confirmed on M4 Pro;
+    //    not yet verified across all Mac models, but device-tree port-number
+    //    is a standard ARM IOKit property so it should be universal.
+    // 2. Positional fallback: PHYs sorted by ID map to sockets sorted by
+    //    ID. Works when PHY count == port count but breaks when there are
+    //    extra PHYs (e.g. M4 Pro has 4 PHYs for 3 ports).
     private func correlate(
         phyData: [PhyInput],
         tbData: [ThunderboltInput],
@@ -203,16 +217,20 @@ extension PortManager {
         // Deduplicate TB data by socket ID (multiple adapters per port, take best)
         let tbBySocket = bestTBPerSocket(tbData)
 
+        // Deduplicate PHY data by port number (multiple PHYs per port, take best)
+        let dedupedPhys = bestPhyPerPort(phyData)
+        let hasDirectMapping = dedupedPhys.contains { $0.portNumber > 0 }
+
         // Build CC lookup by port number
         let ccByPort = Dictionary(ccData.map { ($0.portNumber, $0.active) }, uniquingKeysWith: { a, _ in a })
 
         // Get unique socket IDs sorted (these are our physical ports)
         let socketIDs = tbBySocket.keys.sorted()
 
-        // If no TB data, fall back to PHY IDs as port numbers
+        // If no TB data, use PHY port numbers (or PHY IDs + 1 as fallback)
         if socketIDs.isEmpty {
-            return phyData.map { phy in
-                let portID = phy.phyID + 1
+            return dedupedPhys.map { phy in
+                let portID = phy.portNumber > 0 ? phy.portNumber : (phy.phyID + 1)
                 return buildPortState(
                     portID: portID,
                     phy: phy,
@@ -223,11 +241,27 @@ extension PortManager {
             }
         }
 
-        // Correlate: PHY instances sorted by ID map to sockets sorted by ID.
-        // e.g. PHY 0,1,2,3 maps to Socket 1,2,4 (first 3 PHYs = USB-C ports)
+        // Build PHY lookup for direct mapping
+        let phyByPort: [Int: PhyInput] = {
+            guard hasDirectMapping else { return [:] }
+            return Dictionary(
+                dedupedPhys.compactMap { $0.portNumber > 0 ? ($0.portNumber, $0) : nil },
+                uniquingKeysWith: { existing, _ in existing }
+            )
+        }()
+
+        // Correlate each socket with its PHY data
         var results: [PortState] = []
         for (index, socketID) in socketIDs.enumerated() {
-            let phy = index < phyData.count ? phyData[index] : nil
+            let phy: PhyInput?
+            if hasDirectMapping {
+                // Direct mapping: PHY portNumber matches socket ID
+                phy = phyByPort[socketID]
+            } else {
+                // Positional fallback: PHY sorted by ID maps to socket sorted by ID
+                phy = index < dedupedPhys.count ? dedupedPhys[index] : nil
+            }
+
             let tb = tbBySocket[socketID]
             let power = powerData.first { $0.portIndex == socketID }
 
@@ -258,6 +292,36 @@ extension PortManager {
             }
         }
         return best
+    }
+
+    // Multiple PHY controllers can map to the same physical port.
+    // For example, M4 Pro has 4 PHYs for 3 ports (PHY 0 and PHY 2 both
+    // map to port 1). Pick the one with active transport data.
+    // If port-number isn't available, each PHY is treated as unique.
+    private func bestPhyPerPort(_ phyData: [PhyInput]) -> [PhyInput] {
+        let hasPortNumbers = phyData.contains { $0.portNumber > 0 }
+        guard hasPortNumbers else { return phyData }
+
+        var best: [Int: PhyInput] = [:]
+        for phy in phyData {
+            let key = phy.portNumber > 0 ? phy.portNumber : phy.phyID
+            if let existing = best[key] {
+                // Prefer the PHY with active transport
+                let phyActive = !phy.lane0Transport.isEmpty || !phy.lane1Transport.isEmpty
+                let existingActive = !existing.lane0Transport.isEmpty || !existing.lane1Transport.isEmpty
+                if phyActive && !existingActive {
+                    best[key] = phy
+                }
+            } else {
+                best[key] = phy
+            }
+        }
+
+        return best.values.sorted {
+            let a = $0.portNumber > 0 ? $0.portNumber : $0.phyID
+            let b = $1.portNumber > 0 ? $1.portNumber : $1.phyID
+            return a < b
+        }
     }
 
     private func buildPortState(

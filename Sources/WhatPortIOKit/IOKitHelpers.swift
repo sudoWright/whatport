@@ -69,6 +69,37 @@ func ioProperty(_ service: io_service_t, key: String) -> Any? {
     return cf.takeRetainedValue()
 }
 
+// Read a property from the parent entry in the IOService plane.
+//
+// Used to read "port-number" from the atc-phy device node, which is
+// the parent of the AppleTypeCPhy driver instance. The parent holds
+// device-tree properties (like physical port mapping) that the driver
+// node itself doesn't expose.
+//
+// IORegistryEntryGetParentEntry returns a retained reference, so we
+// release it in defer. "Retained" means IOKit has bumped the reference
+// count for us, and we're responsible for calling IOObjectRelease when
+// done - same pattern as malloc/free in C.
+func ioParentProperty(_ service: io_service_t, key: String) -> Any? {
+    var parent: io_registry_entry_t = 0
+    let kr = IORegistryEntryGetParentEntry(service, kIOServicePlane, &parent)
+    guard kr == KERN_SUCCESS else { return nil }
+    defer { IOObjectRelease(parent) }
+    return ioProperty(parent, key: key)
+}
+
+// Read a Data-encoded little-endian 32-bit integer.
+//
+// IOKit stores some device-tree integer properties as raw bytes rather
+// than CFNumber. For example, "port-number" = <01000000> is the number 1
+// stored as a 4-byte little-endian value. This helper reads those bytes
+// and converts to a native Int.
+func ioDataInt(_ value: Any?) -> Int? {
+    guard let data = value as? Data, data.count >= 4 else { return nil }
+    let raw = data.withUnsafeBytes { $0.load(as: UInt32.self) }
+    return Int(UInt32(littleEndian: raw))
+}
+
 // Get the IOKit class name for a service (e.g. "AppleT8132TypeCPhy").
 func ioClassName(_ service: io_service_t) -> String? {
     var buf = [CChar](repeating: 0, count: 128)
