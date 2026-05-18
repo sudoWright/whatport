@@ -27,6 +27,9 @@ enum SnapshotAdapter {
                     socketID: socketID,
                     currentLinkWidth: tb.currentLinkWidth,
                     currentLinkSpeed: tb.currentLinkSpeed,
+                    supportedLinkWidth: tb.supportedLinkWidth,
+                    supportedLinkSpeed: tb.supportedLinkSpeed,
+                    thunderboltVersion: tb.thunderboltVersion,
                     dualLinkPort: tb.dualLinkPort
                 )
             },
@@ -42,7 +45,61 @@ enum SnapshotAdapter {
                 )
             },
             ccData: snapshot.ccData.map { cc in
-                CCInput(portNumber: cc.portNumber, portType: cc.portType, active: cc.active)
+                CCInput(
+                    portNumber: cc.portNumber,
+                    portType: cc.portType,
+                    active: cc.active,
+                    cableProductType: cc.cableProductType,
+                    cablePDRevision: cc.cablePDRevision
+                )
+            },
+            chargerData: snapshot.chargerData.map { c in
+                ChargerInput(
+                    portType: c.portType,
+                    portNumber: c.portNumber,
+                    maxWatts: c.maxWatts,
+                    voltage: c.voltage,
+                    maxCurrent: c.maxCurrent
+                )
+            },
+            chargingPower: snapshot.chargingPower.map { cp in
+                ChargingPowerInput(
+                    systemPowerIn: cp.systemPowerIn,
+                    systemVoltageIn: cp.systemVoltageIn,
+                    systemCurrentIn: cp.systemCurrentIn,
+                    isCharging: cp.isCharging,
+                    fullyCharged: cp.fullyCharged
+                )
+            },
+            deviceData: snapshot.deviceData.map { d in
+                DeviceInput(
+                    portNumber: d.portNumber,
+                    productName: d.productName,
+                    vendorName: d.vendorName,
+                    speedCode: d.speedCode,
+                    usbVersion: d.usbVersion,
+                    currentDraw: d.currentDraw,
+                    serialNumber: d.serialNumber
+                )
+            },
+            displayData: snapshot.displayData.map { d in
+                DisplayInput(
+                    portNumber: d.portNumber,
+                    productName: d.productName,
+                    maxWidth: d.maxWidth,
+                    maxHeight: d.maxHeight
+                )
+            },
+            portStatsData: snapshot.portStatsData.map { s in
+                PortStatsInput(
+                    portNumber: s.portNumber,
+                    connectCount: s.connectCount,
+                    overcurrentCount: s.overcurrentCount,
+                    enumerationFailureCount: s.enumerationFailureCount,
+                    addressFailureCount: s.addressFailureCount,
+                    linkErrorCount: s.linkErrorCount,
+                    remoteWakeCount: s.remoteWakeCount
+                )
             },
             powerMeteringAvailable: snapshot.powerMeteringAvailable
         )

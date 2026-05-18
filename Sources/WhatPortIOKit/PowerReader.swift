@@ -28,6 +28,25 @@ public struct RawPowerData: Sendable {
     public let powerState: Int
 }
 
+// Live system-level charging power from PowerTelemetryData.
+//
+// PowerTelemetryData sits alongside PowerOutDetails on AppleSmartBattery.
+// It provides real-time power flowing IN from the charger. The key fields:
+//   SystemPowerIn  - total power drawn from the active charger (mW)
+//   SystemVoltageIn - charger voltage at the input rail (mV)
+//   SystemCurrentIn - current drawn from the charger (mA)
+//
+// Only one charger is active at a time (the "best adapter"). SystemPowerIn
+// represents the live draw from that charger, split between system load
+// and battery charging.
+public struct RawChargingPower: Sendable {
+    public let systemPowerIn: Int     // milliwatts, total input from charger
+    public let systemVoltageIn: Int   // millivolts
+    public let systemCurrentIn: Int   // milliamps
+    public let isCharging: Bool       // battery is actively charging
+    public let fullyCharged: Bool     // battery is full
+}
+
 public enum PowerReader {
     public static func readAll() -> [RawPowerData] {
         var results: [RawPowerData] = []
@@ -59,6 +78,38 @@ public enum PowerReader {
         }
 
         return results
+    }
+
+    // Read live charging power and battery state from AppleSmartBattery.
+    // PowerTelemetryData provides real-time input power.
+    // IsCharging / FullyCharged are top-level properties on the same service.
+    // Returns nil only if AppleSmartBattery is absent (unlikely on laptops).
+    public static func readChargingPower() -> RawChargingPower? {
+        var result: RawChargingPower?
+
+        withMatchingServices(className: "AppleSmartBattery") { service in
+            guard let props = ioProperties(service) else { return }
+
+            let isCharging = ioBool(props["IsCharging"])
+            let fullyCharged = ioBool(props["FullyCharged"])
+            let externalConnected = ioBool(props["ExternalConnected"])
+
+            // No charger connected at all, nothing to report
+            guard externalConnected else { return }
+
+            let telemetry = ioDictionary(props["PowerTelemetryData"])
+            let powerIn = ioInt(telemetry["SystemPowerIn"])
+
+            result = RawChargingPower(
+                systemPowerIn: powerIn,
+                systemVoltageIn: ioInt(telemetry["SystemVoltageIn"]),
+                systemCurrentIn: ioInt(telemetry["SystemCurrentIn"]),
+                isCharging: isCharging,
+                fullyCharged: fullyCharged
+            )
+        }
+
+        return result
     }
 
     // Check whether PowerOutDetails is available on this machine.

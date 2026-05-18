@@ -67,11 +67,15 @@ struct PortListView: View {
     private var portList: some View {
         VStack(spacing: 0) {
             ForEach(portManager.ports) { port in
-                PortRowView(port: port)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        selectedPortID = port.id
-                    }
+                PortRowView(
+                    port: port,
+                    isCharging: portManager.isCharging,
+                    fullyCharged: portManager.fullyCharged
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    selectedPortID = port.id
+                }
             }
         }
         .padding(.vertical, 4)
@@ -133,6 +137,8 @@ struct PortListView: View {
 
 struct PortRowView: View {
     let port: PortState
+    var isCharging: Bool = false
+    var fullyCharged: Bool = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -185,26 +191,39 @@ struct PortRowView: View {
     private var summaryText: String {
         guard port.isActive else { return "idle" }
 
+        // Device name prefix (e.g. "Game Drive, ")
+        let device = port.deviceName.map { "\($0), " } ?? ""
+
         if let tb = port.thunderboltLink {
             let lanes = formatLanes(tx: tb.txLanes, rx: tb.rxLanes)
-            return "\(tb.generation.label) \(lanes), \(tb.totalGbps) Gbps"
+            return "\(device)\(tb.generation.label) \(lanes), \(tb.totalGbps) Gbps"
         }
 
         if port.lane0.transport == .displayPort || port.lane1.transport == .displayPort {
             let dpLanes = [port.lane0, port.lane1].filter { $0.transport == .displayPort }.count
-            return "DP alt-mode, \(dpLanes) lane\(dpLanes > 1 ? "s" : "")"
+            return "\(device)DP alt-mode, \(dpLanes) lane\(dpLanes > 1 ? "s" : "")"
         }
 
         if port.lane0.transport == .usb || port.lane1.transport == .usb {
-            return "USB3"
+            let speed = port.usbSpeed?.label ?? "5 Gbps"
+            return "\(device)USB3, \(speed)"
         }
 
         if port.usb2Active {
-            return "USB2"
+            return "\(device)USB2, 480 Mbps"
         }
 
         if port.ccConnected {
-            return "charging"
+            if port.primaryProtocol == .charging {
+                if fullyCharged {
+                    return "Charger Connected, Battery Full"
+                }
+                if isCharging {
+                    return "Charger Connected, Battery Charging"
+                }
+                return "Charger Connected"
+            }
+            return "\(device)connected"
         }
 
         return "active"

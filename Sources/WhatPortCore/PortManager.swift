@@ -13,6 +13,10 @@ public final class PortManager: @unchecked Sendable {
     public private(set) var portCount: Int = 0
     public private(set) var powerMeteringAvailable: Bool = false
 
+    // Battery / charging state (system-level, not per-port)
+    public private(set) var isCharging: Bool = false
+    public private(set) var fullyCharged: Bool = false
+
     // Power history for sparkline graphs (per port ID)
     public private(set) var powerHistory: [Int: [PowerSample]] = [:]
 
@@ -24,20 +28,22 @@ public final class PortManager: @unchecked Sendable {
     // This is the single entry point for all state updates.
     public func applySnapshot(_ snapshot: PortManagerSnapshot) {
         powerMeteringAvailable = snapshot.powerMeteringAvailable
+        isCharging = snapshot.chargingPower?.isCharging ?? false
+        fullyCharged = snapshot.chargingPower?.fullyCharged ?? false
 
         let correlated = correlate(
             phyData: snapshot.phyData,
             tbData: snapshot.tbData,
             powerData: snapshot.powerData,
-            ccData: snapshot.ccData
+            ccData: snapshot.ccData,
+            chargerData: snapshot.chargerData,
+            chargingPower: snapshot.chargingPower,
+            deviceData: snapshot.deviceData,
+            displayData: snapshot.displayData,
+            portStatsData: snapshot.portStatsData
         )
 
-        // portCount tracks USB-C ports only (stable count from hardware).
-        // MagSafe and other non-USB-C ports are dynamic and excluded.
-        let usbCPorts = correlated.filter { $0.portType == .usbC }
-        if portCount == 0 {
-            portCount = usbCPorts.count
-        }
+        portCount = correlated.count
 
         ports = correlated
 
@@ -54,7 +60,7 @@ public final class PortManager: @unchecked Sendable {
     }
 
     public var activePortCount: Int {
-        ports.filter { $0.isActive && $0.portType == .usbC }.count
+        ports.filter { $0.isActive }.count
     }
 }
 
@@ -69,6 +75,11 @@ public struct PortManagerSnapshot: Sendable {
     public let tbData: [ThunderboltInput]
     public let powerData: [PowerInput]
     public let ccData: [CCInput]
+    public let chargerData: [ChargerInput]
+    public let chargingPower: ChargingPowerInput?
+    public let deviceData: [DeviceInput]
+    public let displayData: [DisplayInput]
+    public let portStatsData: [PortStatsInput]
     public let powerMeteringAvailable: Bool
 
     public init(
@@ -77,6 +88,11 @@ public struct PortManagerSnapshot: Sendable {
         tbData: [ThunderboltInput] = [],
         powerData: [PowerInput] = [],
         ccData: [CCInput] = [],
+        chargerData: [ChargerInput] = [],
+        chargingPower: ChargingPowerInput? = nil,
+        deviceData: [DeviceInput] = [],
+        displayData: [DisplayInput] = [],
+        portStatsData: [PortStatsInput] = [],
         powerMeteringAvailable: Bool = false
     ) {
         self.timestamp = timestamp
@@ -84,6 +100,11 @@ public struct PortManagerSnapshot: Sendable {
         self.tbData = tbData
         self.powerData = powerData
         self.ccData = ccData
+        self.chargerData = chargerData
+        self.chargingPower = chargingPower
+        self.deviceData = deviceData
+        self.displayData = displayData
+        self.portStatsData = portStatsData
         self.powerMeteringAvailable = powerMeteringAvailable
     }
 }
@@ -92,11 +113,21 @@ public struct CCInput: Sendable {
     public let portNumber: Int
     public let portType: String   // "USB-C", "MagSafe 3", etc.
     public let active: Bool
+    public let cableProductType: String
+    public let cablePDRevision: Int
 
-    public init(portNumber: Int, portType: String = "USB-C", active: Bool) {
+    public init(
+        portNumber: Int,
+        portType: String = "USB-C",
+        active: Bool,
+        cableProductType: String = "",
+        cablePDRevision: Int = 0
+    ) {
         self.portNumber = portNumber
         self.portType = portType
         self.active = active
+        self.cableProductType = cableProductType
+        self.cablePDRevision = cablePDRevision
     }
 }
 
@@ -141,17 +172,26 @@ public struct ThunderboltInput: Sendable {
     public let socketID: Int
     public let currentLinkWidth: Int
     public let currentLinkSpeed: Int
+    public let supportedLinkWidth: Int
+    public let supportedLinkSpeed: Int
+    public let thunderboltVersion: Int
     public let dualLinkPort: Int
 
     public init(
         socketID: Int,
         currentLinkWidth: Int = 0,
         currentLinkSpeed: Int = 0,
+        supportedLinkWidth: Int = 0,
+        supportedLinkSpeed: Int = 0,
+        thunderboltVersion: Int = 0,
         dualLinkPort: Int = 0
     ) {
         self.socketID = socketID
         self.currentLinkWidth = currentLinkWidth
         self.currentLinkSpeed = currentLinkSpeed
+        self.supportedLinkWidth = supportedLinkWidth
+        self.supportedLinkSpeed = supportedLinkSpeed
+        self.thunderboltVersion = thunderboltVersion
         self.dualLinkPort = dualLinkPort
     }
 }
@@ -181,6 +221,128 @@ public struct PowerInput: Sendable {
         self.configuredVoltage = configuredVoltage
         self.configuredCurrent = configuredCurrent
         self.vconnCurrent = vconnCurrent
+    }
+}
+
+public struct ChargerInput: Sendable {
+    public let portType: String   // "MagSafe 3", "USB-C", etc.
+    public let portNumber: Int
+    public let maxWatts: Int      // milliwatts
+    public let voltage: Int       // millivolts
+    public let maxCurrent: Int    // milliamps
+
+    public init(
+        portType: String,
+        portNumber: Int,
+        maxWatts: Int = 0,
+        voltage: Int = 0,
+        maxCurrent: Int = 0
+    ) {
+        self.portType = portType
+        self.portNumber = portNumber
+        self.maxWatts = maxWatts
+        self.voltage = voltage
+        self.maxCurrent = maxCurrent
+    }
+}
+
+// Live charging power from PowerTelemetryData on AppleSmartBattery.
+// System-level (not per-port): represents total power drawn from the
+// active charger. Only one charger supplies power at a time.
+public struct ChargingPowerInput: Sendable {
+    public let systemPowerIn: Int     // milliwatts
+    public let systemVoltageIn: Int   // millivolts
+    public let systemCurrentIn: Int   // milliamps
+    public let isCharging: Bool       // battery is actively charging
+    public let fullyCharged: Bool     // battery is full
+
+    public init(
+        systemPowerIn: Int,
+        systemVoltageIn: Int,
+        systemCurrentIn: Int,
+        isCharging: Bool = false,
+        fullyCharged: Bool = false
+    ) {
+        self.systemPowerIn = systemPowerIn
+        self.systemVoltageIn = systemVoltageIn
+        self.systemCurrentIn = systemCurrentIn
+        self.isCharging = isCharging
+        self.fullyCharged = fullyCharged
+    }
+}
+
+public struct DeviceInput: Sendable {
+    public let portNumber: Int
+    public let productName: String
+    public let vendorName: String
+    public let speedCode: Int       // USB Device Speed enum
+    public let usbVersion: Int      // bcdUSB (e.g. 800 = USB 3.2)
+    public let currentDraw: Int     // mA allocated
+    public let serialNumber: String
+
+    public init(
+        portNumber: Int,
+        productName: String,
+        vendorName: String = "",
+        speedCode: Int = 0,
+        usbVersion: Int = 0,
+        currentDraw: Int = 0,
+        serialNumber: String = ""
+    ) {
+        self.portNumber = portNumber
+        self.productName = productName
+        self.vendorName = vendorName
+        self.speedCode = speedCode
+        self.usbVersion = usbVersion
+        self.currentDraw = currentDraw
+        self.serialNumber = serialNumber
+    }
+}
+
+public struct DisplayInput: Sendable {
+    public let portNumber: Int
+    public let productName: String
+    public let maxWidth: Int
+    public let maxHeight: Int
+
+    public init(
+        portNumber: Int,
+        productName: String,
+        maxWidth: Int = 0,
+        maxHeight: Int = 0
+    ) {
+        self.portNumber = portNumber
+        self.productName = productName
+        self.maxWidth = maxWidth
+        self.maxHeight = maxHeight
+    }
+}
+
+public struct PortStatsInput: Sendable {
+    public let portNumber: Int
+    public let connectCount: Int
+    public let overcurrentCount: Int
+    public let enumerationFailureCount: Int
+    public let addressFailureCount: Int
+    public let linkErrorCount: Int
+    public let remoteWakeCount: Int
+
+    public init(
+        portNumber: Int,
+        connectCount: Int = 0,
+        overcurrentCount: Int = 0,
+        enumerationFailureCount: Int = 0,
+        addressFailureCount: Int = 0,
+        linkErrorCount: Int = 0,
+        remoteWakeCount: Int = 0
+    ) {
+        self.portNumber = portNumber
+        self.connectCount = connectCount
+        self.overcurrentCount = overcurrentCount
+        self.enumerationFailureCount = enumerationFailureCount
+        self.addressFailureCount = addressFailureCount
+        self.linkErrorCount = linkErrorCount
+        self.remoteWakeCount = remoteWakeCount
     }
 }
 
@@ -217,7 +379,12 @@ extension PortManager {
         phyData: [PhyInput],
         tbData: [ThunderboltInput],
         powerData: [PowerInput],
-        ccData: [CCInput]
+        ccData: [CCInput],
+        chargerData: [ChargerInput] = [],
+        chargingPower: ChargingPowerInput? = nil,
+        deviceData: [DeviceInput] = [],
+        displayData: [DisplayInput] = [],
+        portStatsData: [PortStatsInput] = []
     ) -> [PortState] {
         // Deduplicate TB data by socket ID (multiple adapters per port, take best)
         let tbBySocket = bestTBPerSocket(tbData)
@@ -249,7 +416,22 @@ extension PortManager {
                     ccActive: ccByPort[portID] ?? false
                 )
             }
-            results.append(contentsOf: buildNonUSBCPorts(nonUSBCCC))
+            // Apply charging power to USB-C sink ports (same logic as main path)
+            let batteryChargingEarly = chargingPower?.isCharging ?? false
+            for i in results.indices {
+                guard results[i].power == nil && results[i].ccConnected else { continue }
+                if batteryChargingEarly, let cp = chargingPower, cp.systemPowerIn > 0 {
+                    results[i].power = PortPower(
+                        watts: Double(cp.systemPowerIn) / 1000.0,
+                        current: cp.systemCurrentIn,
+                        voltage: cp.systemVoltageIn,
+                        configuredVoltage: cp.systemVoltageIn,
+                        configuredCurrent: cp.systemCurrentIn,
+                        vconnCurrent: 0
+                    )
+                }
+            }
+            results.append(contentsOf: buildNonUSBCPorts(nonUSBCCC, chargerData: chargerData, chargingPower: chargingPower))
             return results
         }
 
@@ -286,8 +468,105 @@ extension PortManager {
             ))
         }
 
+        // Apply charging power to USB-C sink ports (connected to a charger,
+        // no PowerOutDetails because power flows IN, not OUT).
+        // Only show live watts when the battery is actually charging.
+        // When battery is full, power data is left nil so the UI shows
+        // the charger as connected without a misleading wattage.
+        let batteryCharging = chargingPower?.isCharging ?? false
+
+        for i in results.indices {
+            guard results[i].power == nil && results[i].ccConnected else { continue }
+
+            if batteryCharging, let cp = chargingPower, cp.systemPowerIn > 0 {
+                results[i].power = PortPower(
+                    watts: Double(cp.systemPowerIn) / 1000.0,
+                    current: cp.systemCurrentIn,
+                    voltage: cp.systemVoltageIn,
+                    configuredVoltage: cp.systemVoltageIn,
+                    configuredCurrent: cp.systemCurrentIn,
+                    vconnCurrent: 0
+                )
+            }
+        }
+
         // Append non-USB-C ports (MagSafe, etc.) at the end
-        results.append(contentsOf: buildNonUSBCPorts(nonUSBCCC))
+        results.append(contentsOf: buildNonUSBCPorts(nonUSBCCC, chargerData: chargerData, chargingPower: chargingPower))
+
+        // Build lookup dictionaries for enrichment data
+        let devicesByPort = Dictionary(
+            deviceData.map { ($0.portNumber, $0) },
+            uniquingKeysWith: { a, _ in a }
+        )
+        let displaysByPort = Dictionary(
+            displayData.map { ($0.portNumber, $0) },
+            uniquingKeysWith: { a, _ in a }
+        )
+        let statsByPort = Dictionary(
+            portStatsData.map { ($0.portNumber, $0) },
+            uniquingKeysWith: { a, _ in a }
+        )
+        let ccByPortFull = Dictionary(
+            usbCCC.map { ($0.portNumber, $0) },
+            uniquingKeysWith: { a, _ in a }
+        )
+
+        for i in results.indices {
+            let portID = results[i].id
+
+            // Display name takes priority over USB device name since a USB
+            // device on a TB/DP port is usually the hub, not the display.
+            if let display = displaysByPort[portID] {
+                results[i].deviceName = display.productName
+            } else if let device = devicesByPort[portID] {
+                results[i].deviceName = device.productName
+                if device.speedCode > 0 {
+                    results[i].usbSpeed = USBSpeed(code: device.speedCode)
+                }
+            }
+
+            // Full USB device info for the detail view
+            if let device = devicesByPort[portID] {
+                let speed = device.speedCode > 0 ? USBSpeed(code: device.speedCode) : nil
+                results[i].usbDevice = USBDeviceInfo(
+                    productName: device.productName,
+                    vendorName: device.vendorName,
+                    serialNumber: device.serialNumber.isEmpty ? nil : device.serialNumber,
+                    speed: speed,
+                    usbVersion: formatBcdUSB(device.usbVersion),
+                    currentDraw: device.currentDraw
+                )
+            }
+
+            // Cable identity from CC SOP' data
+            if let cc = ccByPortFull[portID], !cc.cableProductType.isEmpty {
+                results[i].cable = CableInfo(
+                    productType: cc.cableProductType,
+                    pdRevision: cc.cablePDRevision
+                )
+            }
+
+            // Port statistics (lifetime counters)
+            if let stats = statsByPort[portID] {
+                results[i].portStats = PortStatistics(
+                    connectCount: stats.connectCount,
+                    overcurrentCount: stats.overcurrentCount,
+                    enumerationFailureCount: stats.enumerationFailureCount,
+                    addressFailureCount: stats.addressFailureCount,
+                    linkErrorCount: stats.linkErrorCount,
+                    remoteWakeCount: stats.remoteWakeCount
+                )
+            }
+
+            // TB port capability (supported speed/width even when no link active)
+            if let tb = tbBySocket[portID] {
+                results[i].thunderboltCapability = ThunderboltCapability(
+                    supportedLinkSpeed: tb.supportedLinkSpeed,
+                    supportedLinkWidth: tb.supportedLinkWidth,
+                    thunderboltVersion: tb.thunderboltVersion
+                )
+            }
+        }
 
         return results
     }
@@ -342,14 +621,36 @@ extension PortManager {
     // Build port entries for non-USB-C connectors (MagSafe, etc.)
     // These only have CC data, no PHY or TB. They use IDs starting at
     // 100 to avoid colliding with USB-C socket IDs.
-    private func buildNonUSBCPorts(_ ccEntries: [CCInput]) -> [PortState] {
+    private func buildNonUSBCPorts(
+        _ ccEntries: [CCInput],
+        chargerData: [ChargerInput],
+        chargingPower: ChargingPowerInput? = nil
+    ) -> [PortState] {
         ccEntries.compactMap { cc in
             guard cc.active else { return nil }
             let portType: PortType = cc.portType.lowercased().contains("magsafe") ? .magSafe : .usbC
+
+            // Only show live watts when battery is actively charging.
+            // When battery is full, leave power nil so the UI can show
+            // "battery full" instead of a misleading wattage number.
+            var power: PortPower?
+            let batteryIsCharging = chargingPower?.isCharging ?? false
+            if batteryIsCharging, let cp = chargingPower, cp.systemPowerIn > 0 {
+                power = PortPower(
+                    watts: Double(cp.systemPowerIn) / 1000.0,
+                    current: cp.systemCurrentIn,
+                    voltage: cp.systemVoltageIn,
+                    configuredVoltage: cp.systemVoltageIn,
+                    configuredCurrent: cp.systemCurrentIn,
+                    vconnCurrent: 0
+                )
+            }
+
             return PortState(
                 id: 100 + cc.portNumber,
                 portType: portType,
-                ccConnected: true
+                ccConnected: true,
+                power: power
             )
         }
     }
@@ -414,6 +715,18 @@ extension PortManager {
         case 0x8: return (1, 3)  // asymmetric RX
         default: return (1, 1)
         }
+    }
+
+    // bcdUSB is BCD-encoded: 0x0200 = 512 = USB 2.0, 0x0300 = 768 = USB 3.0,
+    // 0x0310 = 784 = USB 3.1, 0x0320 = 800 = USB 3.2
+    private func formatBcdUSB(_ bcd: Int) -> String {
+        let major = bcd / 256
+        let minor = (bcd % 256) / 16
+        let patch = bcd % 16
+        if patch > 0 {
+            return "USB \(major).\(minor)\(patch)"
+        }
+        return "USB \(major).\(minor)"
     }
 
     private func parseLane(transport: String?, powerLevel: String?, client: String?) -> LaneState {

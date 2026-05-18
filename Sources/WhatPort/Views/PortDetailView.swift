@@ -8,21 +8,41 @@ struct PortDetailView: View {
     let powerMeteringAvailable: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header
-            Divider()
-            laneDiagram
-            Divider()
-            powerSection
-            if !powerHistory.isEmpty {
-                powerChart
-            }
-            if let name = port.deviceName {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                header
                 Divider()
-                deviceSection(name: name)
+
+                if let device = port.usbDevice {
+                    deviceSection(device)
+                    Divider()
+                }
+
+                laneDiagram
+                Divider()
+
+                powerSection
+                if !powerHistory.isEmpty {
+                    powerChart
+                }
+
+                if let tb = port.thunderboltCapability {
+                    Divider()
+                    thunderboltSection(capability: tb, link: port.thunderboltLink)
+                }
+
+                if let cable = port.cable {
+                    Divider()
+                    cableSection(cable)
+                }
+
+                if let stats = port.portStats {
+                    Divider()
+                    statsSection(stats)
+                }
             }
+            .padding(16)
         }
-        .padding(16)
         .frame(width: 320)
     }
 
@@ -33,13 +53,20 @@ struct PortDetailView: View {
             Circle()
                 .fill(protocolColor)
                 .frame(width: 10, height: 10)
-            Text("Port \(port.id)")
+            Text(headerTitle)
                 .font(.headline)
             Spacer()
             Text(protocolLabel)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var headerTitle: String {
+        if port.portType == .magSafe {
+            return "MagSafe"
+        }
+        return "Port \(port.id)"
     }
 
     private var protocolColor: Color {
@@ -63,6 +90,52 @@ struct PortDetailView: View {
         case .usbOnly: return "USB"
         case .charging: return "Charging"
         case .idle: return "idle"
+        }
+    }
+
+    // MARK: - Device
+
+    private func deviceSection(_ device: USBDeviceInfo) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Device")
+                .font(.subheadline)
+                .foregroundStyle(.tertiary)
+
+            HStack {
+                Text(device.productName)
+                    .font(.body.weight(.medium))
+                Spacer()
+                if !device.vendorName.isEmpty {
+                    Text(device.vendorName)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            HStack(spacing: 12) {
+                if let speed = device.speed {
+                    LabeledValue(label: "Speed", value: speed.label)
+                }
+                if !device.usbVersion.isEmpty {
+                    LabeledValue(label: "Version", value: device.usbVersion)
+                }
+                if device.currentDraw > 0 {
+                    LabeledValue(label: "Power Draw", value: "\(device.currentDraw) mA")
+                }
+            }
+
+            if let serial = device.serialNumber {
+                HStack {
+                    Text("Serial")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    Text(serial)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
         }
     }
 
@@ -154,15 +227,91 @@ struct PortDetailView: View {
         }
     }
 
-    // MARK: - Device
+    // MARK: - Thunderbolt
 
-    private func deviceSection(name: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Connected")
+    private func thunderboltSection(
+        capability: ThunderboltCapability,
+        link: ThunderboltLinkState?
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Thunderbolt")
                 .font(.subheadline)
                 .foregroundStyle(.tertiary)
-            Text(name)
-                .font(.body)
+
+            if let link {
+                let lanes = formatLanes(tx: link.txLanes, rx: link.rxLanes)
+                Text("\(link.generation.label) \(lanes), \(link.totalGbps) Gbps")
+                    .font(.body.weight(.medium))
+            } else {
+                Text("No active link")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 12) {
+                LabeledValue(
+                    label: "Max Speed",
+                    value: "\(capability.maxGeneration.label) (\(capability.maxGeneration.perLaneGbps) Gbps/lane)"
+                )
+                LabeledValue(
+                    label: "Max Lanes",
+                    value: capability.maxLanes > 1 ? "Dual-lane" : "Single-lane"
+                )
+            }
+        }
+    }
+
+    private func formatLanes(tx: Int, rx: Int) -> String {
+        if tx == rx {
+            return tx > 1 ? "dual-lane" : "single-lane"
+        }
+        return "\(tx)TX/\(rx)RX"
+    }
+
+    // MARK: - Cable
+
+    private func cableSection(_ cable: CableInfo) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Cable")
+                .font(.subheadline)
+                .foregroundStyle(.tertiary)
+            HStack(spacing: 12) {
+                LabeledValue(label: "Type", value: cable.productType)
+                if cable.pdRevision > 0 {
+                    LabeledValue(label: "PD Revision", value: "\(cable.pdRevision).0")
+                }
+            }
+        }
+    }
+
+    // MARK: - Port Statistics
+
+    private func statsSection(_ stats: PortStatistics) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Port Statistics")
+                .font(.subheadline)
+                .foregroundStyle(.tertiary)
+
+            HStack(spacing: 12) {
+                LabeledValue(label: "Connections", value: "\(stats.connectCount)")
+                if stats.overcurrentCount > 0 {
+                    LabeledValue(label: "Overcurrent", value: "\(stats.overcurrentCount)")
+                }
+                if stats.linkErrorCount > 0 {
+                    LabeledValue(label: "Link Errors", value: "\(stats.linkErrorCount)")
+                }
+                if stats.enumerationFailureCount > 0 {
+                    LabeledValue(label: "Enum Failures", value: "\(stats.enumerationFailureCount)")
+                }
+            }
+
+            // Only show error counts row if there are any errors
+            if stats.overcurrentCount == 0 && stats.linkErrorCount == 0
+                && stats.enumerationFailureCount == 0 && stats.addressFailureCount == 0 {
+                Text("No errors")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 }

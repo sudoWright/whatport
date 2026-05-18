@@ -15,6 +15,11 @@ public struct PortState: Identifiable, Sendable {
     public var thunderboltLink: ThunderboltLinkState?
     public var power: PortPower?
     public var deviceName: String?
+    public var usbSpeed: USBSpeed?
+    public var usbDevice: USBDeviceInfo?
+    public var cable: CableInfo?
+    public var portStats: PortStatistics?
+    public var thunderboltCapability: ThunderboltCapability?
 
     // A port is active if any data transport is running or something is
     // physically connected on the CC line (e.g. a charger).
@@ -44,7 +49,12 @@ public struct PortState: Identifiable, Sendable {
         ccConnected: Bool = false,
         thunderboltLink: ThunderboltLinkState? = nil,
         power: PortPower? = nil,
-        deviceName: String? = nil
+        deviceName: String? = nil,
+        usbSpeed: USBSpeed? = nil,
+        usbDevice: USBDeviceInfo? = nil,
+        cable: CableInfo? = nil,
+        portStats: PortStatistics? = nil,
+        thunderboltCapability: ThunderboltCapability? = nil
     ) {
         self.id = id
         self.portType = portType
@@ -55,6 +65,11 @@ public struct PortState: Identifiable, Sendable {
         self.thunderboltLink = thunderboltLink
         self.power = power
         self.deviceName = deviceName
+        self.usbSpeed = usbSpeed
+        self.usbDevice = usbDevice
+        self.cable = cable
+        self.portStats = portStats
+        self.thunderboltCapability = thunderboltCapability
     }
 }
 
@@ -189,6 +204,138 @@ public enum PortType: Sendable, Equatable {
         case .usbC: return "USB-C"
         case .magSafe: return "MagSafe"
         }
+    }
+}
+
+// MARK: - USB Speed
+
+public enum USBSpeed: Sendable, Equatable {
+    case lowSpeed       // 1.5 Mbps
+    case fullSpeed      // 12 Mbps
+    case highSpeed      // 480 Mbps (USB 2.0)
+    case superSpeed     // 5 Gbps (USB 3.0)
+    case superSpeedPlus // 10 Gbps (USB 3.2 Gen 2)
+    case superSpeed2x2  // 20 Gbps (USB 3.2 Gen 2x2)
+
+    public init(code: Int) {
+        switch code {
+        case 0: self = .lowSpeed
+        case 1: self = .fullSpeed
+        case 2: self = .highSpeed
+        case 3: self = .superSpeed
+        case 4: self = .superSpeedPlus
+        case 5: self = .superSpeed2x2
+        default: self = .fullSpeed
+        }
+    }
+
+    public var label: String {
+        switch self {
+        case .lowSpeed: return "1.5 Mbps"
+        case .fullSpeed: return "12 Mbps"
+        case .highSpeed: return "480 Mbps"
+        case .superSpeed: return "5 Gbps"
+        case .superSpeedPlus: return "10 Gbps"
+        case .superSpeed2x2: return "20 Gbps"
+        }
+    }
+}
+
+// MARK: - USB Device Info
+
+public struct USBDeviceInfo: Sendable, Equatable {
+    public var productName: String
+    public var vendorName: String
+    public var serialNumber: String?
+    public var speed: USBSpeed?
+    public var usbVersion: String    // "USB 3.2", "USB 2.0", etc.
+    public var currentDraw: Int      // mA allocated by host
+
+    public init(
+        productName: String,
+        vendorName: String,
+        serialNumber: String? = nil,
+        speed: USBSpeed? = nil,
+        usbVersion: String = "",
+        currentDraw: Int = 0
+    ) {
+        self.productName = productName
+        self.vendorName = vendorName
+        self.serialNumber = serialNumber
+        self.speed = speed
+        self.usbVersion = usbVersion
+        self.currentDraw = currentDraw
+    }
+}
+
+// MARK: - Cable Info
+
+public struct CableInfo: Sendable, Equatable {
+    public var productType: String   // "Passive Cable", "Active Cable"
+    public var pdRevision: Int       // USB PD Specification Revision (1, 2, 3)
+
+    public init(productType: String, pdRevision: Int = 0) {
+        self.productType = productType
+        self.pdRevision = pdRevision
+    }
+}
+
+// MARK: - Port Statistics
+
+public struct PortStatistics: Sendable, Equatable {
+    public var connectCount: Int
+    public var overcurrentCount: Int
+    public var enumerationFailureCount: Int
+    public var addressFailureCount: Int
+    public var linkErrorCount: Int
+    public var remoteWakeCount: Int
+
+    public init(
+        connectCount: Int = 0,
+        overcurrentCount: Int = 0,
+        enumerationFailureCount: Int = 0,
+        addressFailureCount: Int = 0,
+        linkErrorCount: Int = 0,
+        remoteWakeCount: Int = 0
+    ) {
+        self.connectCount = connectCount
+        self.overcurrentCount = overcurrentCount
+        self.enumerationFailureCount = enumerationFailureCount
+        self.addressFailureCount = addressFailureCount
+        self.linkErrorCount = linkErrorCount
+        self.remoteWakeCount = remoteWakeCount
+    }
+}
+
+// MARK: - Thunderbolt Capability
+
+// Port-level TB capability (always present for TB-capable ports,
+// even when no device is connected and no link is active).
+public struct ThunderboltCapability: Sendable, Equatable {
+    public var supportedLinkSpeed: Int   // max speed code (12 = TB5, etc.)
+    public var supportedLinkWidth: Int   // max width code (2 = dual-lane)
+    public var thunderboltVersion: Int
+
+    public var maxGeneration: TBGeneration {
+        TBGeneration(speedCode: supportedLinkSpeed)
+    }
+
+    public var maxLanes: Int {
+        switch supportedLinkWidth {
+        case 0x1: return 1
+        case 0x2: return 2
+        default: return 1
+        }
+    }
+
+    public init(
+        supportedLinkSpeed: Int = 0,
+        supportedLinkWidth: Int = 0,
+        thunderboltVersion: Int = 0
+    ) {
+        self.supportedLinkSpeed = supportedLinkSpeed
+        self.supportedLinkWidth = supportedLinkWidth
+        self.thunderboltVersion = thunderboltVersion
     }
 }
 

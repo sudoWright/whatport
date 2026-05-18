@@ -18,6 +18,11 @@ public struct PortSnapshot: Sendable {
     public let thunderboltData: [RawThunderboltData]
     public let powerData: [RawPowerData]
     public let ccData: [RawCCData]
+    public let chargerData: [RawChargerData]
+    public let chargingPower: RawChargingPower?
+    public let deviceData: [RawDeviceInfo]
+    public let displayData: [RawDisplayInfo]
+    public let portStatsData: [RawPortStats]
     public let powerMeteringAvailable: Bool
 
     public init(
@@ -26,6 +31,11 @@ public struct PortSnapshot: Sendable {
         thunderboltData: [RawThunderboltData] = [],
         powerData: [RawPowerData] = [],
         ccData: [RawCCData] = [],
+        chargerData: [RawChargerData] = [],
+        chargingPower: RawChargingPower? = nil,
+        deviceData: [RawDeviceInfo] = [],
+        displayData: [RawDisplayInfo] = [],
+        portStatsData: [RawPortStats] = [],
         powerMeteringAvailable: Bool = false
     ) {
         self.timestamp = timestamp
@@ -33,6 +43,11 @@ public struct PortSnapshot: Sendable {
         self.thunderboltData = thunderboltData
         self.powerData = powerData
         self.ccData = ccData
+        self.chargerData = chargerData
+        self.chargingPower = chargingPower
+        self.deviceData = deviceData
+        self.displayData = displayData
+        self.portStatsData = portStatsData
         self.powerMeteringAvailable = powerMeteringAvailable
     }
 }
@@ -48,6 +63,11 @@ public enum SnapshotReader {
             thunderboltData: ThunderboltReader.readAll(),
             powerData: PowerReader.readAll(),
             ccData: CCReader.readAll(),
+            chargerData: ChargerReader.readAll(),
+            chargingPower: PowerReader.readChargingPower(),
+            deviceData: DeviceReader.readUSBDevices(),
+            displayData: DisplayReader.readDisplays(),
+            portStatsData: PortStatsReader.readAll(),
             powerMeteringAvailable: PowerReader.isPowerMeteringAvailable()
         )
     }

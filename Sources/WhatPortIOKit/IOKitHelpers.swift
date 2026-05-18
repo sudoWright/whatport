@@ -100,6 +100,32 @@ func ioDataInt(_ value: Any?) -> Int? {
     return Int(UInt32(littleEndian: raw))
 }
 
+// Read a property from an ancestor N levels up in the IOService plane.
+//
+// Walks from the given service up through parent entries. Each
+// IORegistryEntryGetParentEntry returns a retained reference that we
+// release as we move on. The final ancestor is also released via defer.
+//
+// levels=1 is equivalent to ioParentProperty. levels=3 walks up three
+// generations (e.g. USB device → USB port → XHCI → usb-drd).
+func ioAncestorProperty(_ service: io_service_t, key: String, levels: Int) -> Any? {
+    guard levels > 0 else { return ioProperty(service, key: key) }
+
+    var previous: io_registry_entry_t = service
+    var current: io_registry_entry_t = 0
+
+    for i in 0..<levels {
+        let kr = IORegistryEntryGetParentEntry(previous, kIOServicePlane, &current)
+        // Release intermediate parents (but never the original service)
+        if i > 0 { IOObjectRelease(previous) }
+        guard kr == KERN_SUCCESS else { return nil }
+        previous = current
+    }
+
+    defer { IOObjectRelease(current) }
+    return ioProperty(current, key: key)
+}
+
 // Get the IOKit class name for a service (e.g. "AppleT8132TypeCPhy").
 func ioClassName(_ service: io_service_t) -> String? {
     var buf = [CChar](repeating: 0, count: 128)

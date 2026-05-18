@@ -15,6 +15,9 @@ public struct RawCCData: Sendable {
     public let portNumber: Int
     public let portType: String   // "USB-C", "MagSafe 3", etc.
     public let active: Bool
+    // Cable identity from SOP' child service (when a cable is detected)
+    public let cableProductType: String  // "Passive Cable", "Active Cable", ""
+    public let cablePDRevision: Int      // USB PD Specification Revision (1, 2, 3)
 }
 
 public enum CCReader {
@@ -34,9 +37,50 @@ public enum CCReader {
             guard portNumber > 0, !seen.contains(key) else { return }
             seen.insert(key)
 
-            results.append(RawCCData(portNumber: portNumber, portType: portType, active: active))
+            // Read cable identity from SOP' child service.
+            // SOP' represents the cable plug. Its Metadata dict has
+            // "Product Type Description" (Passive/Active Cable) and
+            // Specification Revision (USB PD rev).
+            let cable = readCableIdentity(ccService: service)
+
+            results.append(RawCCData(
+                portNumber: portNumber,
+                portType: portType,
+                active: active,
+                cableProductType: cable.productType,
+                cablePDRevision: cable.pdRevision
+            ))
         }
 
         return results.sorted { $0.portNumber < $1.portNumber }
+    }
+
+    // Walk child services of a CC entry looking for SOP' (cable identity).
+    // The SOP' service has Metadata with cable VDOs decoded by the kernel.
+    private static func readCableIdentity(
+        ccService: io_service_t
+    ) -> (productType: String, pdRevision: Int) {
+        var iter: io_iterator_t = 0
+        let kr = IORegistryEntryGetChildIterator(ccService, kIOServicePlane, &iter)
+        guard kr == KERN_SUCCESS else { return ("", 0) }
+        defer { IOObjectRelease(iter) }
+
+        while case let child = IOIteratorNext(iter), child != 0 {
+            defer { IOObjectRelease(child) }
+            guard let childProps = ioProperties(child) else { continue }
+
+            let componentName = ioString(childProps["ComponentName"])
+            guard componentName == "SOP'" else { continue }
+
+            let metadata = ioDictionary(childProps["Metadata"])
+            let productType = ioString(metadata["Product Type Description"])
+            let pdRevision = ioInt(childProps["Specification Revision"])
+
+            if !productType.isEmpty {
+                return (productType, pdRevision)
+            }
+        }
+
+        return ("", 0)
     }
 }
