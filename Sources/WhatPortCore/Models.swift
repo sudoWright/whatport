@@ -117,12 +117,16 @@ public enum TBGeneration: Sendable, Equatable {
     case tb4
     case tb5
 
-    // Maps IOKit "Current Link Speed" values to generation.
-    // From research: 0x8=TB3 (10 Gbps), 4=TB4 (20 Gbps), 12=TB5 (40 Gbps)
+    // Maps IOKit "Current Link Speed" register values to generation.
+    // Lower value = faster. From thunderbolt-fabric.md research:
+    // 0x2 = Gen 4 / TB5 (40 Gbps/lane)
+    // 0x4 = Gen 3 / TB4 (20 Gbps/lane)
+    // 0x8 = Gen 2 / TB3 (10 Gbps/lane)
     public init(speedCode: Int) {
         switch speedCode {
+        case 0x2: self = .tb5
+        case 0x4: self = .tb4
         case 0x8: self = .tb3
-        case 12: self = .tb5
         default: self = .tb4
         }
     }

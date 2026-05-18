@@ -8,8 +8,8 @@ import Testing
 
 @Test func tbGenerationFromSpeedCode() {
     #expect(TBGeneration(speedCode: 0x8) == .tb3)
-    #expect(TBGeneration(speedCode: 4) == .tb4)
-    #expect(TBGeneration(speedCode: 12) == .tb5)
+    #expect(TBGeneration(speedCode: 0x4) == .tb4)
+    #expect(TBGeneration(speedCode: 0x2) == .tb5)
     #expect(TBGeneration(speedCode: 99) == .tb4) // unknown defaults to TB4
 }
 

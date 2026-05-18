@@ -65,7 +65,7 @@ import Testing
         powerData: [
             PowerInput(
                 portIndex: 1,
-                watts: 590,
+                watts: 5900,
                 current: 113,
                 adapterVoltage: 5200,
                 configuredVoltage: 5000,
@@ -93,14 +93,14 @@ import Testing
         let snapshot = PortManagerSnapshot(
             phyData: [PhyInput(phyID: 0)],
             tbData: [ThunderboltInput(socketID: 1)],
-            powerData: [PowerInput(portIndex: 1, watts: i * 100)]
+            powerData: [PowerInput(portIndex: 1, watts: i * 1000)]
         )
         manager.applySnapshot(snapshot)
     }
 
     let history = manager.powerHistory[1] ?? []
     #expect(history.count == 20) // capped at maxPowerSamples
-    #expect(history.last?.watts == 24.0) // last sample: 2400 centiwatts = 24.0W
+    #expect(history.last?.watts == 24.0) // last sample: 24000 mW = 24.0W
 }
 
 @Test func portManagerDeduplicatesTBAdapters() {

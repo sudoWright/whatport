@@ -274,18 +274,19 @@ extension PortManager {
         var tbLink: ThunderboltLinkState?
         if let tb, tb.currentLinkWidth > 0, tb.currentLinkSpeed > 0 {
             let gen = TBGeneration(speedCode: tb.currentLinkSpeed)
+            let (tx, rx) = decodeLinkWidth(tb.currentLinkWidth)
             tbLink = ThunderboltLinkState(
                 generation: gen,
                 perLaneGbps: gen.perLaneGbps,
-                txLanes: tb.currentLinkWidth,
-                rxLanes: tb.currentLinkWidth
+                txLanes: tx,
+                rxLanes: rx
             )
         }
 
         var portPower: PortPower?
         if let pwr = power, pwr.watts > 0 {
             portPower = PortPower(
-                watts: Double(pwr.watts) / 100.0,
+                watts: Double(pwr.watts) / 1000.0,
                 current: pwr.current,
                 voltage: pwr.adapterVoltage,
                 configuredVoltage: pwr.configuredVoltage,
@@ -303,6 +304,22 @@ extension PortManager {
             thunderboltLink: tbLink,
             power: portPower
         )
+    }
+
+    // Current Link Width is a bitmask, not a lane count.
+    // From thunderbolt-fabric.md:
+    //   0x1 = single lane (1 TX, 1 RX)
+    //   0x2 = dual lane (2 TX, 2 RX)
+    //   0x4 = asymmetric TX (3 TX, 1 RX) - TB5 only
+    //   0x8 = asymmetric RX (1 TX, 3 RX) - TB5 only
+    private func decodeLinkWidth(_ width: Int) -> (tx: Int, rx: Int) {
+        switch width {
+        case 0x1: return (1, 1)
+        case 0x2: return (2, 2)
+        case 0x4: return (3, 1)  // asymmetric TX
+        case 0x8: return (1, 3)  // asymmetric RX
+        default: return (1, 1)
+        }
     }
 
     private func parseLane(transport: String?, powerLevel: String?, client: String?) -> LaneState {
