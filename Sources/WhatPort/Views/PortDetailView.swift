@@ -182,13 +182,15 @@ struct PortDetailView: View {
                 label: "Lane 0",
                 state: port.lane0,
                 tbLink: port.thunderboltLink,
-                usbSpeed: port.usbSpeed
+                usbSpeed: port.usbSpeed,
+                dpLinkRate: port.dpLinkRate
             )
             LaneBar(
                 label: "Lane 1",
                 state: port.lane1,
                 tbLink: port.thunderboltLink,
-                usbSpeed: port.usbSpeed
+                usbSpeed: port.usbSpeed,
+                dpLinkRate: port.dpLinkRate
             )
             USB2Bar(active: port.usb2Active)
 
@@ -375,6 +377,7 @@ struct LaneBar: View {
     let state: LaneState
     let tbLink: ThunderboltLinkState?
     var usbSpeed: USBSpeed?
+    var dpLinkRate: String = ""
 
     var body: some View {
         HStack(spacing: 6) {
@@ -411,6 +414,10 @@ struct LaneBar: View {
             }
             return "CIO"
         case .displayPort:
+            let rate = Self.formatDPLinkRate(dpLinkRate)
+            if !rate.isEmpty {
+                return "DP \u{00B7} \(rate)"
+            }
             return "DisplayPort"
         case .usb:
             let speed = usbSpeed?.label ?? "5 Gbps"
@@ -418,6 +425,23 @@ struct LaneBar: View {
         case .idle:
             return ""
         }
+    }
+
+    // Parse "5.40Gbps/lane (HBR2)" into "5.4 Gbps"
+    static func formatDPLinkRate(_ raw: String) -> String {
+        guard !raw.isEmpty else { return "" }
+        // Extract the numeric Gbps value before "/lane"
+        guard let slashIdx = raw.firstIndex(of: "/") else { return raw }
+        let prefix = String(raw[raw.startIndex..<slashIdx])
+            .replacingOccurrences(of: "Gbps", with: "")
+        // Parse and re-format to drop trailing zeros (5.40 -> 5.4)
+        if let value = Double(prefix) {
+            if value == value.rounded() {
+                return "\(Int(value)) Gbps"
+            }
+            return String(format: "%.1f Gbps", value)
+        }
+        return raw
     }
 }
 

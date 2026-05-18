@@ -55,9 +55,15 @@ public enum PhyReader {
             // USB2 is a separate sub-dictionary
             let usb2 = ioDictionary(props["AppleTypeCPhyUSB2"])
 
-            // DisplayPort pixel clock info (present when DP is active)
+            // DisplayPort pixel clock info. Nested under "PCLK 0", "PCLK 1", etc.
+            // Each sub-dict has "Link Rate" = "5.40Gbps/lane (HBR2)".
+            // Grab the first one we find.
             let dpPclk = ioDictionary(props["AppleTypeCPhyDisplayPortPclk"])
-            let dpTunnel = ioString(props["AppleTypeCPhyDisplayPortTunnel"])
+            let dpLinkRate = firstNestedString(in: dpPclk, childPrefix: "PCLK", key: "Link Rate")
+
+            // DP tunnel info. Nested under "Tunnel 0", "Tunnel 1", etc.
+            let dpTunnelDict = ioDictionary(props["AppleTypeCPhyDisplayPortTunnel"])
+            let dpTunnel = firstNestedString(in: dpTunnelDict, childPrefix: "Tunnel", key: "Link Rate")
 
             let data = RawPhyData(
                 phyID: phyID,
@@ -70,12 +76,28 @@ public enum PhyReader {
                 lane1Client: ioString(lane1["Client"]),
                 usb2Transport: ioString(usb2["Transport"]),
                 usb2Client: ioString(usb2["Client"]),
-                dpLinkRate: ioString(dpPclk["Link Rate"]),
+                dpLinkRate: dpLinkRate,
                 dpTunnel: dpTunnel
             )
             results.append(data)
         }
 
         return results.sorted { $0.phyID < $1.phyID }
+    }
+
+    // IOKit nests DP data under numbered keys: "PCLK 0", "PCLK 1", etc.
+    // Walk the parent dict looking for "<prefix> N" keys, return the
+    // requested property from the first match that has it.
+    private static func firstNestedString(
+        in dict: [String: Any],
+        childPrefix: String,
+        key: String
+    ) -> String {
+        for i in 0..<4 {
+            let child = ioDictionary(dict["\(childPrefix) \(i)"])
+            let value = ioString(child[key])
+            if !value.isEmpty { return value }
+        }
+        return ""
     }
 }

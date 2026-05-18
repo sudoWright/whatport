@@ -144,6 +144,8 @@ public struct PhyInput: Sendable {
     public let lane1PowerLevel: String
     public let lane1Client: String
     public let usb2Transport: String
+    // DP link rate from PHY pixel clock data, e.g. "5.40Gbps/lane (HBR2)"
+    public let dpLinkRate: String
 
     public init(
         phyID: Int,
@@ -154,7 +156,8 @@ public struct PhyInput: Sendable {
         lane1Transport: String = "",
         lane1PowerLevel: String = "",
         lane1Client: String = "",
-        usb2Transport: String = ""
+        usb2Transport: String = "",
+        dpLinkRate: String = ""
     ) {
         self.phyID = phyID
         self.portNumber = portNumber
@@ -165,6 +168,7 @@ public struct PhyInput: Sendable {
         self.lane1PowerLevel = lane1PowerLevel
         self.lane1Client = lane1Client
         self.usb2Transport = usb2Transport
+        self.dpLinkRate = dpLinkRate
     }
 }
 
@@ -690,7 +694,7 @@ extension PortManager {
             )
         }
 
-        return PortState(
+        var state = PortState(
             id: portID,
             lane0: lane0,
             lane1: lane1,
@@ -699,6 +703,8 @@ extension PortManager {
             thunderboltLink: tbLink,
             power: portPower
         )
+        state.dpLinkRate = phy?.dpLinkRate ?? ""
+        return state
     }
 
     // Current Link Width is a bitmask, not a lane count.

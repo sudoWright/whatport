@@ -20,6 +20,9 @@ public struct PortState: Identifiable, Sendable {
     public var cable: CableInfo?
     public var portStats: PortStatistics?
     public var thunderboltCapability: ThunderboltCapability?
+    // Raw DP link rate from PHY, e.g. "5.40Gbps/lane (HBR2)". Empty when
+    // no DisplayPort connection is active on this port.
+    public var dpLinkRate: String = ""
 
     // A port is active if any data transport is running or something is
     // physically connected on the CC line (e.g. a charger).

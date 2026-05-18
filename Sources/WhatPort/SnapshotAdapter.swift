@@ -18,7 +18,8 @@ enum SnapshotAdapter {
                     lane1Transport: phy.lane1Transport,
                     lane1PowerLevel: phy.lane1PowerLevel,
                     lane1Client: phy.lane1Client,
-                    usb2Transport: phy.usb2Transport
+                    usb2Transport: phy.usb2Transport,
+                    dpLinkRate: phy.dpLinkRate
                 )
             },
             tbData: snapshot.thunderboltData.compactMap { tb in
