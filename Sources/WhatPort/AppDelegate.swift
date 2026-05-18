@@ -82,13 +82,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for await snapshot in stream {
                 let managerSnapshot = SnapshotAdapter.convert(snapshot)
                 portManager.applySnapshot(managerSnapshot)
-                let summary = portManager.ports.map { p in
-                    "P\(p.id):\(p.isActive ? "ON" : "off") L0=\(p.lane0.transport) L1=\(p.lane1.transport) cc=\(p.ccConnected)"
-                }.joined(separator: " | ")
-                debugLog("\(portManager.activePortCount)/\(portManager.portCount) active: \(summary)")
                 updateBadge()
             }
-            debugLog("stream ended")
         }
     }
 
@@ -137,19 +132,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow = window
-    }
-
-    private func debugLog(_ msg: String) {
-        let ts = ISO8601DateFormatter().string(from: Date())
-        let line = "[\(ts)] \(msg)\n"
-        let url = URL(fileURLWithPath: "/tmp/whatport-debug.log")
-        if let fh = try? FileHandle(forWritingTo: url) {
-            fh.seekToEndOfFile()
-            fh.write(line.data(using: .utf8)!)
-            fh.closeFile()
-        } else {
-            try? line.data(using: .utf8)?.write(to: url)
-        }
     }
 
     @objc private func togglePopover() {

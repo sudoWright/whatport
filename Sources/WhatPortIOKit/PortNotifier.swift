@@ -138,7 +138,6 @@ final class PortNotifier: @unchecked Sendable {
         debounceTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(100))
             guard !Task.isCancelled else { return }
-            NSLog("[WhatPort] notification debounce fired")
             self?.onChange?()
         }
     }
