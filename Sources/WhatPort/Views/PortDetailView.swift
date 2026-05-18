@@ -379,12 +379,23 @@ struct LaneBar: View {
     var usbSpeed: USBSpeed?
     var dpLinkRate: String = ""
 
+    // Power level from the PHY updates in real-time as devices
+    // sleep/wake. "on" = lane actively carrying data right now.
+    private var isLanePowered: Bool {
+        state.powerLevel == .on
+    }
+
     var body: some View {
         HStack(spacing: 6) {
+            // Live power indicator: green dot when powered, dim when sleeping
+            Circle()
+                .fill(powerIndicatorColor)
+                .frame(width: 6, height: 6)
+
             Text(label)
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .frame(width: 48, alignment: .trailing)
+                .frame(width: 42, alignment: .trailing)
 
             RoundedRectangle(cornerRadius: 3)
                 .fill(barColor)
@@ -397,13 +408,23 @@ struct LaneBar: View {
         }
     }
 
+    private var powerIndicatorColor: Color {
+        guard state.transport != .idle else { return .clear }
+        return isLanePowered ? .green : .gray.opacity(0.3)
+    }
+
     private var barColor: Color {
-        switch state.transport {
-        case .thunderbolt: return .purple
-        case .displayPort: return .orange
-        case .usb: return .green
-        case .idle: return .gray.opacity(0.15)
+        let base: Color = switch state.transport {
+        case .thunderbolt: .purple
+        case .displayPort: .orange
+        case .usb: .green
+        case .idle: .gray.opacity(0.15)
         }
+        // Dim the bar when the lane is allocated but not powered
+        if state.transport != .idle && !isLanePowered {
+            return base.opacity(0.35)
+        }
+        return base
     }
 
     private var barLabel: String {
