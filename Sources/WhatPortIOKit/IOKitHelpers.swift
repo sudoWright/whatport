@@ -1,0 +1,104 @@
+import Foundation
+import IOKit
+
+// Type-safe wrappers for IOKit registry property values.
+//
+// IOKit returns properties as CF types bridged to Any. These helpers
+// safely cast to Swift types, returning sensible defaults on failure.
+// Adapted from what-cable's IOKitHelpers.
+
+func ioInt(_ value: Any?) -> Int {
+    if let n = value as? NSNumber { return n.intValue }
+    if let i = value as? Int { return i }
+    if let s = value as? String, let i = Int(s) { return i }
+    return 0
+}
+
+func ioBool(_ value: Any?) -> Bool {
+    if let n = value as? NSNumber { return n.boolValue }
+    if let b = value as? Bool { return b }
+    return false
+}
+
+func ioString(_ value: Any?) -> String {
+    if let s = value as? String { return s }
+    return ""
+}
+
+func ioDictionary(_ value: Any?) -> [String: Any] {
+    if let dict = value as? [String: Any] { return dict }
+    if let nsDict = value as? NSDictionary {
+        var converted: [String: Any] = [:]
+        for case let (key, val) as (String, Any) in nsDict {
+            converted[key] = val
+        }
+        return converted
+    }
+    return [:]
+}
+
+func ioArray(_ value: Any?) -> [Any] {
+    if let array = value as? [Any] { return array }
+    if let nsArray = value as? NSArray { return nsArray.map { $0 } }
+    return []
+}
+
+// Read all properties from an IOKit service as a Swift dictionary.
+//
+// IORegistryEntryCreateCFProperties fills an Unmanaged<CFMutableDictionary>.
+// "Unmanaged" means Swift doesn't manage the memory automatically.
+// takeRetainedValue() tells Swift to take ownership and release it later.
+func ioProperties(_ service: io_service_t) -> [String: Any]? {
+    var unmanaged: Unmanaged<CFMutableDictionary>?
+    let kr = IORegistryEntryCreateCFProperties(service, &unmanaged, kCFAllocatorDefault, 0)
+    guard kr == KERN_SUCCESS, let dict = unmanaged?.takeRetainedValue() else { return nil }
+    return dict as? [String: Any]
+}
+
+// Read a single property from an IOKit service.
+//
+// IORegistryEntryCreateCFProperty returns a single CF value (string, number, dict, etc.)
+// wrapped in Unmanaged. We take retained ownership and bridge to Any.
+func ioProperty(_ service: io_service_t, key: String) -> Any? {
+    guard let cf = IORegistryEntryCreateCFProperty(
+        service,
+        key as CFString,
+        kCFAllocatorDefault,
+        0
+    ) else { return nil }
+    return cf.takeRetainedValue()
+}
+
+// Get the IOKit class name for a service (e.g. "AppleT8132TypeCPhy").
+func ioClassName(_ service: io_service_t) -> String? {
+    var buf = [CChar](repeating: 0, count: 128)
+    let kr = IOObjectGetClass(service, &buf)
+    guard kr == KERN_SUCCESS else { return nil }
+    let len = buf.firstIndex(of: 0) ?? buf.count
+    return String(decoding: buf[..<len].map { UInt8(bitPattern: $0) }, as: UTF8.self)
+}
+
+// Match IOKit services by class name and iterate them.
+//
+// This is the core IOKit pattern:
+// 1. IOServiceMatching() creates a match dictionary for a class name
+// 2. IOServiceGetMatchingServices() finds all matching services
+// 3. IOIteratorNext() walks the results
+//
+// The closure receives each service. Services are released automatically
+// after the closure returns (via defer + IOObjectRelease).
+func withMatchingServices(
+    className: String,
+    body: (io_service_t) -> Void
+) {
+    let matching = IOServiceMatching(className)
+    var iter: io_iterator_t = 0
+    let kr = IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iter)
+    guard kr == KERN_SUCCESS else { return }
+    defer { IOObjectRelease(iter) }
+
+    while case let service = IOIteratorNext(iter), service != 0 {
+        defer { IOObjectRelease(service) }
+        body(service)
+    }
+}
