@@ -79,54 +79,49 @@ struct PortDetailView: View {
         case .charging:
             powerSection
             if !powerHistory.isEmpty { powerChart }
-            laneDiagram
+            laneInfoSection
             if let cap = port.thunderboltCapability {
                 thunderboltSection(capability: cap, link: port.thunderboltLink)
             }
             if let cable = port.cable { cableSection(cable) }
-            if let stats = port.portStats { statsSection(stats) }
 
         case .usbOnly:
             if let device = port.usbDevice { deviceSection(device) }
             powerSection
             if !powerHistory.isEmpty { powerChart }
-            laneDiagram
+            laneInfoSection
             if let cap = port.thunderboltCapability {
                 thunderboltSection(capability: cap, link: port.thunderboltLink)
             }
             if let cable = port.cable { cableSection(cable) }
-            if let stats = port.portStats { statsSection(stats) }
 
         case .thunderbolt:
             if let device = port.usbDevice { deviceSection(device) }
             if let cap = port.thunderboltCapability {
                 thunderboltSection(capability: cap, link: port.thunderboltLink)
             }
-            laneDiagram
+            laneInfoSection
             powerSection
             if !powerHistory.isEmpty { powerChart }
             if let cable = port.cable { cableSection(cable) }
-            if let stats = port.portStats { statsSection(stats) }
 
         case .displayPort:
             if let device = port.usbDevice { deviceSection(device) }
-            laneDiagram
+            laneInfoSection
             powerSection
             if !powerHistory.isEmpty { powerChart }
             if let cap = port.thunderboltCapability {
                 thunderboltSection(capability: cap, link: port.thunderboltLink)
             }
             if let cable = port.cable { cableSection(cable) }
-            if let stats = port.portStats { statsSection(stats) }
 
         case .idle:
-            laneDiagram
+            laneInfoSection
             if let cap = port.thunderboltCapability {
                 thunderboltSection(capability: cap, link: port.thunderboltLink)
             }
             powerSection
             if !powerHistory.isEmpty { powerChart }
-            if let stats = port.portStats { statsSection(stats) }
         }
     }
 
@@ -176,17 +171,67 @@ struct PortDetailView: View {
         }
     }
 
-    // MARK: - Lane Diagram
+    // MARK: - Lanes + Stats (combined)
 
-    private var laneDiagram: some View {
+    private var laneInfoSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Lanes")
                 .font(.subheadline)
                 .foregroundStyle(.tertiary)
-            LaneBar(label: "Lane 0", state: port.lane0, tbLink: port.thunderboltLink)
-            LaneBar(label: "Lane 1", state: port.lane1, tbLink: port.thunderboltLink)
+            LaneBar(
+                label: "Lane 0",
+                state: port.lane0,
+                tbLink: port.thunderboltLink,
+                usbSpeed: port.usbSpeed
+            )
+            LaneBar(
+                label: "Lane 1",
+                state: port.lane1,
+                tbLink: port.thunderboltLink,
+                usbSpeed: port.usbSpeed
+            )
             USB2Bar(active: port.usb2Active)
+
+            if let stats = port.portStats {
+                statsLine(stats)
+                    .padding(.top, 2)
+            }
         }
+    }
+
+    private func statsLine(_ stats: PortStatistics) -> some View {
+        let errorCount = stats.overcurrentCount + stats.linkErrorCount
+            + stats.enumerationFailureCount + stats.addressFailureCount
+
+        return HStack(spacing: 4) {
+            Text("\(stats.connectCount) connections")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("\u{00B7}")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            Text(errorSummary(stats, total: errorCount))
+                .font(.caption)
+                .foregroundColor(errorCount > 0 ? .orange : .gray)
+        }
+    }
+
+    private func errorSummary(_ stats: PortStatistics, total: Int) -> String {
+        if total == 0 { return "No errors" }
+        var parts: [String] = []
+        if stats.linkErrorCount > 0 {
+            parts.append("\(stats.linkErrorCount) link")
+        }
+        if stats.overcurrentCount > 0 {
+            parts.append("\(stats.overcurrentCount) overcurrent")
+        }
+        if stats.enumerationFailureCount > 0 {
+            parts.append("\(stats.enumerationFailureCount) enum")
+        }
+        if stats.addressFailureCount > 0 {
+            parts.append("\(stats.addressFailureCount) address")
+        }
+        return parts.joined(separator: ", ") + " error\(total > 1 ? "s" : "")"
     }
 
     // MARK: - Power Section
@@ -321,36 +366,6 @@ struct PortDetailView: View {
         }
     }
 
-    // MARK: - Port Statistics
-
-    private func statsSection(_ stats: PortStatistics) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Port Statistics")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
-
-            HStack(spacing: 12) {
-                LabeledValue(label: "Connections", value: "\(stats.connectCount)")
-                if stats.overcurrentCount > 0 {
-                    LabeledValue(label: "Overcurrent", value: "\(stats.overcurrentCount)")
-                }
-                if stats.linkErrorCount > 0 {
-                    LabeledValue(label: "Link Errors", value: "\(stats.linkErrorCount)")
-                }
-                if stats.enumerationFailureCount > 0 {
-                    LabeledValue(label: "Enum Failures", value: "\(stats.enumerationFailureCount)")
-                }
-            }
-
-            // Only show error counts row if there are any errors
-            if stats.overcurrentCount == 0 && stats.linkErrorCount == 0
-                && stats.enumerationFailureCount == 0 && stats.addressFailureCount == 0 {
-                Text("No errors")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
-            }
-        }
-    }
 }
 
 // MARK: - Lane Bar
@@ -359,6 +374,7 @@ struct LaneBar: View {
     let label: String
     let state: LaneState
     let tbLink: ThunderboltLinkState?
+    var usbSpeed: USBSpeed?
 
     var body: some View {
         HStack(spacing: 6) {
@@ -375,11 +391,6 @@ struct LaneBar: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white)
                 }
-
-            Text(speedLabel)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.tertiary)
-                .frame(width: 70, alignment: .leading)
         }
     }
 
@@ -394,24 +405,16 @@ struct LaneBar: View {
 
     private var barLabel: String {
         switch state.transport {
-        case .thunderbolt: return "CIO"
-        case .displayPort: return "DisplayPort"
-        case .usb: return "USB3"
-        case .idle: return ""
-        }
-    }
-
-    private var speedLabel: String {
-        switch state.transport {
         case .thunderbolt:
             if let tb = tbLink {
-                return "\(tb.perLaneGbps) Gbps"
+                return "CIO \u{00B7} \(tb.perLaneGbps) Gbps"
             }
-            return ""
+            return "CIO"
         case .displayPort:
-            return "DP"
+            return "DisplayPort"
         case .usb:
-            return "5 Gbps"
+            let speed = usbSpeed?.label ?? "5 Gbps"
+            return "USB3 \u{00B7} \(speed)"
         case .idle:
             return ""
         }
@@ -433,14 +436,11 @@ struct USB2Bar: View {
                 .frame(height: 18)
                 .overlay {
                     if active {
-                        Text("active")
+                        Text("480 Mbps")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.white)
                     }
                 }
-
-            Text("")
-                .frame(width: 70)
         }
     }
 }
