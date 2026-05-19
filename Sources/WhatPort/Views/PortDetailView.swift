@@ -79,11 +79,13 @@ struct PortDetailView: View {
         case .charging:
             powerSection
             if !powerHistory.isEmpty { powerChart }
-            laneInfoSection
-            if let cap = port.thunderboltCapability {
-                thunderboltSection(capability: cap, link: port.thunderboltLink)
+            if port.portType != .magSafe {
+                laneInfoSection
+                if let cap = port.thunderboltCapability {
+                    thunderboltSection(capability: cap, link: port.thunderboltLink)
+                }
+                if let cable = port.cable { cableSection(cable) }
             }
-            if let cable = port.cable { cableSection(cable) }
 
         case .usbOnly:
             if let device = port.usbDevice { deviceSection(device) }
@@ -182,14 +184,14 @@ struct PortDetailView: View {
                 label: "Lane 0",
                 state: port.lane0,
                 tbLink: port.thunderboltLink,
-                usbSpeed: port.usbSpeed,
+                liveTransports: port.liveTransports,
                 dpLinkRate: port.dpLinkRate
             )
             LaneBar(
                 label: "Lane 1",
                 state: port.lane1,
                 tbLink: port.thunderboltLink,
-                usbSpeed: port.usbSpeed,
+                liveTransports: port.liveTransports,
                 dpLinkRate: port.dpLinkRate
             )
             USB2Bar(active: port.usb2Active)
@@ -376,8 +378,14 @@ struct LaneBar: View {
     let label: String
     let state: LaneState
     let tbLink: ThunderboltLinkState?
-    var usbSpeed: USBSpeed?
+    var liveTransports: [LiveTransport] = []
+    // PHY-derived DP link rate as fallback when no transport state available
     var dpLinkRate: String = ""
+
+    // Live transport data matching this lane's protocol
+    private var liveTransport: LiveTransport? {
+        liveTransports.first { $0.kind == state.transport }
+    }
 
     // Power level from the PHY updates in real-time as devices
     // sleep/wake. "on" = lane actively carrying data right now.
@@ -401,9 +409,16 @@ struct LaneBar: View {
                 .fill(barColor)
                 .frame(height: 18)
                 .overlay {
-                    Text(barLabel)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white)
+                    HStack(spacing: 3) {
+                        Text(barLabel)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white)
+                        if let lt = liveTransport, lt.tunneled {
+                            Text("tunnel")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.6))
+                        }
+                    }
                 }
         }
     }
@@ -430,32 +445,41 @@ struct LaneBar: View {
     private var barLabel: String {
         switch state.transport {
         case .thunderbolt:
+            // Prefer live CIO transport data, fall back to TB link info
+            if let lt = liveTransport, !lt.dataRate.isEmpty {
+                return "CIO \u{00B7} \(lt.dataRate)"
+            }
             if let tb = tbLink {
                 return "CIO \u{00B7} \(tb.perLaneGbps) Gbps"
             }
             return "CIO"
         case .displayPort:
+            // Prefer live DP transport data, fall back to PHY link rate
+            if let lt = liveTransport, !lt.dataRate.isEmpty {
+                return "DP \u{00B7} \(lt.dataRate)"
+            }
             let rate = Self.formatDPLinkRate(dpLinkRate)
             if !rate.isEmpty {
                 return "DP \u{00B7} \(rate)"
             }
             return "DisplayPort"
         case .usb:
-            let speed = usbSpeed?.label ?? "5 Gbps"
-            return "USB3 \u{00B7} \(speed)"
+            // Prefer live USB3 transport data, fall back to device speed
+            if let lt = liveTransport, !lt.dataRate.isEmpty {
+                return "USB3 \u{00B7} \(lt.dataRate)"
+            }
+            return "USB3"
         case .idle:
             return ""
         }
     }
 
-    // Parse "5.40Gbps/lane (HBR2)" into "5.4 Gbps"
+    // Parse PHY "5.40Gbps/lane (HBR2)" into "5.4 Gbps" (fallback only)
     static func formatDPLinkRate(_ raw: String) -> String {
         guard !raw.isEmpty else { return "" }
-        // Extract the numeric Gbps value before "/lane"
         guard let slashIdx = raw.firstIndex(of: "/") else { return raw }
         let prefix = String(raw[raw.startIndex..<slashIdx])
             .replacingOccurrences(of: "Gbps", with: "")
-        // Parse and re-format to drop trailing zeros (5.40 -> 5.4)
         if let value = Double(prefix) {
             if value == value.rounded() {
                 return "\(Int(value)) Gbps"

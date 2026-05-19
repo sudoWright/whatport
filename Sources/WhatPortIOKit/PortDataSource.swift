@@ -24,6 +24,10 @@ public struct PortSnapshot: Sendable {
     public let displayData: [RawDisplayInfo]
     public let portStatsData: [RawPortStats]
     public let powerMeteringAvailable: Bool
+    // Live transport state from IOPortTransportState* services
+    public let usb3Transport: [RawUSB3TransportState]
+    public let dpTransport: [RawDPTransportState]
+    public let cioTransport: [RawCIOTransportState]
 
     public init(
         timestamp: Date = .now,
@@ -36,7 +40,10 @@ public struct PortSnapshot: Sendable {
         deviceData: [RawDeviceInfo] = [],
         displayData: [RawDisplayInfo] = [],
         portStatsData: [RawPortStats] = [],
-        powerMeteringAvailable: Bool = false
+        powerMeteringAvailable: Bool = false,
+        usb3Transport: [RawUSB3TransportState] = [],
+        dpTransport: [RawDPTransportState] = [],
+        cioTransport: [RawCIOTransportState] = []
     ) {
         self.timestamp = timestamp
         self.phyData = phyData
@@ -49,6 +56,9 @@ public struct PortSnapshot: Sendable {
         self.displayData = displayData
         self.portStatsData = portStatsData
         self.powerMeteringAvailable = powerMeteringAvailable
+        self.usb3Transport = usb3Transport
+        self.dpTransport = dpTransport
+        self.cioTransport = cioTransport
     }
 }
 
@@ -68,7 +78,10 @@ public enum SnapshotReader {
             deviceData: DeviceReader.readUSBDevices(),
             displayData: DisplayReader.readDisplays(),
             portStatsData: PortStatsReader.readAll(),
-            powerMeteringAvailable: PowerReader.isPowerMeteringAvailable()
+            powerMeteringAvailable: PowerReader.isPowerMeteringAvailable(),
+            usb3Transport: TransportStateReader.readUSB3(),
+            dpTransport: TransportStateReader.readDisplayPort(),
+            cioTransport: TransportStateReader.readCIO()
         )
     }
 }

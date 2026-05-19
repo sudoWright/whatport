@@ -40,7 +40,10 @@ public final class PortManager: @unchecked Sendable {
             chargingPower: snapshot.chargingPower,
             deviceData: snapshot.deviceData,
             displayData: snapshot.displayData,
-            portStatsData: snapshot.portStatsData
+            portStatsData: snapshot.portStatsData,
+            usb3Transport: snapshot.usb3Transport,
+            dpTransport: snapshot.dpTransport,
+            cioTransport: snapshot.cioTransport
         )
 
         portCount = correlated.count
@@ -81,6 +84,10 @@ public struct PortManagerSnapshot: Sendable {
     public let displayData: [DisplayInput]
     public let portStatsData: [PortStatsInput]
     public let powerMeteringAvailable: Bool
+    // Live transport state from IOPortTransportState* services
+    public let usb3Transport: [USB3TransportInput]
+    public let dpTransport: [DPTransportInput]
+    public let cioTransport: [CIOTransportInput]
 
     public init(
         timestamp: Date = .now,
@@ -93,7 +100,10 @@ public struct PortManagerSnapshot: Sendable {
         deviceData: [DeviceInput] = [],
         displayData: [DisplayInput] = [],
         portStatsData: [PortStatsInput] = [],
-        powerMeteringAvailable: Bool = false
+        powerMeteringAvailable: Bool = false,
+        usb3Transport: [USB3TransportInput] = [],
+        dpTransport: [DPTransportInput] = [],
+        cioTransport: [CIOTransportInput] = []
     ) {
         self.timestamp = timestamp
         self.phyData = phyData
@@ -106,6 +116,9 @@ public struct PortManagerSnapshot: Sendable {
         self.displayData = displayData
         self.portStatsData = portStatsData
         self.powerMeteringAvailable = powerMeteringAvailable
+        self.usb3Transport = usb3Transport
+        self.dpTransport = dpTransport
+        self.cioTransport = cioTransport
     }
 }
 
@@ -350,6 +363,80 @@ public struct PortStatsInput: Sendable {
     }
 }
 
+// MARK: - Live transport state inputs
+
+public struct USB3TransportInput: Sendable {
+    public let portNumber: Int
+    public let active: Bool
+    public let dataRate: String          // "10 Gbps"
+    public let generation: String        // "Gen 2"
+    public let generationFamily: String  // "USB 3.x"
+    public let tunneled: Bool
+
+    public init(
+        portNumber: Int,
+        active: Bool = false,
+        dataRate: String = "",
+        generation: String = "",
+        generationFamily: String = "",
+        tunneled: Bool = false
+    ) {
+        self.portNumber = portNumber
+        self.active = active
+        self.dataRate = dataRate
+        self.generation = generation
+        self.generationFamily = generationFamily
+        self.tunneled = tunneled
+    }
+}
+
+public struct DPTransportInput: Sendable {
+    public let portNumber: Int
+    public let active: Bool
+    public let linkRate: String          // "5.4 Gbps (HBR2)"
+    public let laneCount: Int
+    public let maxLaneCount: Int
+    public let tunneled: Bool
+    public let sinkCount: Int
+
+    public init(
+        portNumber: Int,
+        active: Bool = false,
+        linkRate: String = "",
+        laneCount: Int = 0,
+        maxLaneCount: Int = 0,
+        tunneled: Bool = false,
+        sinkCount: Int = 0
+    ) {
+        self.portNumber = portNumber
+        self.active = active
+        self.linkRate = linkRate
+        self.laneCount = laneCount
+        self.maxLaneCount = maxLaneCount
+        self.tunneled = tunneled
+        self.sinkCount = sinkCount
+    }
+}
+
+public struct CIOTransportInput: Sendable {
+    public let portNumber: Int
+    public let active: Bool
+    public let dataRate: String
+    public let tunneled: Bool
+
+    public init(
+        portNumber: Int,
+        active: Bool = false,
+        dataRate: String = "",
+        tunneled: Bool = false
+    ) {
+        self.portNumber = portNumber
+        self.active = active
+        self.dataRate = dataRate
+        self.tunneled = tunneled
+    }
+}
+
 // MARK: - Power sample for history graph
 
 public struct PowerSample: Sendable {
@@ -388,7 +475,10 @@ extension PortManager {
         chargingPower: ChargingPowerInput? = nil,
         deviceData: [DeviceInput] = [],
         displayData: [DisplayInput] = [],
-        portStatsData: [PortStatsInput] = []
+        portStatsData: [PortStatsInput] = [],
+        usb3Transport: [USB3TransportInput] = [],
+        dpTransport: [DPTransportInput] = [],
+        cioTransport: [CIOTransportInput] = []
     ) -> [PortState] {
         // Deduplicate TB data by socket ID (multiple adapters per port, take best)
         let tbBySocket = bestTBPerSocket(tbData)
@@ -570,9 +660,57 @@ extension PortManager {
                     thunderboltVersion: tb.thunderboltVersion
                 )
             }
+
+            // Live transport state (real-time link data per transport)
+            results[i].liveTransports = buildLiveTransports(
+                portID: portID,
+                usb3Transport: usb3Transport,
+                dpTransport: dpTransport,
+                cioTransport: cioTransport
+            )
         }
 
         return results
+    }
+
+    // Build LiveTransport entries for a port from the transport state services.
+    // Only includes transports that are active on this port.
+    private func buildLiveTransports(
+        portID: Int,
+        usb3Transport: [USB3TransportInput],
+        dpTransport: [DPTransportInput],
+        cioTransport: [CIOTransportInput]
+    ) -> [LiveTransport] {
+        var transports: [LiveTransport] = []
+
+        if let usb3 = usb3Transport.first(where: { $0.portNumber == portID && $0.active }) {
+            transports.append(LiveTransport(
+                kind: .usb,
+                dataRate: usb3.dataRate,
+                generation: usb3.generation,
+                tunneled: usb3.tunneled
+            ))
+        }
+
+        if let dp = dpTransport.first(where: { $0.portNumber == portID && $0.active }) {
+            transports.append(LiveTransport(
+                kind: .displayPort,
+                dataRate: dp.linkRate,
+                laneCount: dp.laneCount,
+                maxLaneCount: dp.maxLaneCount,
+                tunneled: dp.tunneled
+            ))
+        }
+
+        if let cio = cioTransport.first(where: { $0.portNumber == portID && $0.active }) {
+            transports.append(LiveTransport(
+                kind: .thunderbolt,
+                dataRate: cio.dataRate,
+                tunneled: cio.tunneled
+            ))
+        }
+
+        return transports
     }
 
     // Multiple TB adapters exist per socket (one per lane). Pick the one

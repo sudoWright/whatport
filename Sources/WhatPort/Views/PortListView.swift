@@ -202,11 +202,20 @@ struct PortRowView: View {
         }
 
         if port.lane0.transport == .displayPort || port.lane1.transport == .displayPort {
+            let dpLive = port.liveTransports.first { $0.kind == .displayPort }
+            if let dp = dpLive, !dp.dataRate.isEmpty {
+                let lanes = dp.laneCount > 0 ? ", \(dp.laneCount) lane\(dp.laneCount > 1 ? "s" : "")" : ""
+                return "\(device)DP alt-mode, \(dp.dataRate)\(lanes)"
+            }
             let dpLanes = [port.lane0, port.lane1].filter { $0.transport == .displayPort }.count
             return "\(device)DP alt-mode, \(dpLanes) lane\(dpLanes > 1 ? "s" : "")"
         }
 
         if port.lane0.transport == .usb || port.lane1.transport == .usb {
+            let usbLive = port.liveTransports.first { $0.kind == .usb }
+            if let usb = usbLive, !usb.dataRate.isEmpty {
+                return "\(device)USB3, \(usb.dataRate)"
+            }
             let speed = port.usbSpeed?.label ?? "5 Gbps"
             return "\(device)USB3, \(speed)"
         }

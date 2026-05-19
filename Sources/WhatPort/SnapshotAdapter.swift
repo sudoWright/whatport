@@ -102,7 +102,36 @@ enum SnapshotAdapter {
                     remoteWakeCount: s.remoteWakeCount
                 )
             },
-            powerMeteringAvailable: snapshot.powerMeteringAvailable
+            powerMeteringAvailable: snapshot.powerMeteringAvailable,
+            usb3Transport: snapshot.usb3Transport.map { t in
+                USB3TransportInput(
+                    portNumber: t.portNumber,
+                    active: t.active,
+                    dataRate: t.dataRate,
+                    generation: t.generation,
+                    generationFamily: t.generationFamily,
+                    tunneled: t.tunneled
+                )
+            },
+            dpTransport: snapshot.dpTransport.map { t in
+                DPTransportInput(
+                    portNumber: t.portNumber,
+                    active: t.active,
+                    linkRate: t.linkRate,
+                    laneCount: t.laneCount,
+                    maxLaneCount: t.maxLaneCount,
+                    tunneled: t.tunneled,
+                    sinkCount: t.sinkCount
+                )
+            },
+            cioTransport: snapshot.cioTransport.map { t in
+                CIOTransportInput(
+                    portNumber: t.portNumber,
+                    active: t.active,
+                    dataRate: t.dataRate,
+                    tunneled: t.tunneled
+                )
+            }
         )
     }
 }

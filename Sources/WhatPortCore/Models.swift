@@ -21,8 +21,13 @@ public struct PortState: Identifiable, Sendable {
     public var portStats: PortStatistics?
     public var thunderboltCapability: ThunderboltCapability?
     // Raw DP link rate from PHY, e.g. "5.40Gbps/lane (HBR2)". Empty when
-    // no DisplayPort connection is active on this port.
+    // no DisplayPort connection is active on this port. Fallback; prefer
+    // liveTransports when available.
     public var dpLinkRate: String = ""
+
+    // Live transport state from IOPortTransportState* services.
+    // One entry per active transport on this port (USB3, DP, CIO).
+    public var liveTransports: [LiveTransport] = []
 
     // A port is active if any data transport is running or something is
     // physically connected on the CC line (e.g. a charger).
@@ -339,6 +344,35 @@ public struct ThunderboltCapability: Sendable, Equatable {
         self.supportedLinkSpeed = supportedLinkSpeed
         self.supportedLinkWidth = supportedLinkWidth
         self.thunderboltVersion = thunderboltVersion
+    }
+}
+
+// MARK: - Live Transport State
+
+// Real-time link data from IOPortTransportState* services.
+// One per active transport on a port. Updated on every snapshot.
+public struct LiveTransport: Sendable, Equatable {
+    public var kind: LaneTransport       // .usb, .displayPort, .thunderbolt
+    public var dataRate: String          // "10 Gbps", "5.4 Gbps (HBR2)"
+    public var generation: String        // "Gen 2", "USB 3.x" (USB only)
+    public var laneCount: Int            // DP only; 0 otherwise
+    public var maxLaneCount: Int         // DP only
+    public var tunneled: Bool
+
+    public init(
+        kind: LaneTransport,
+        dataRate: String = "",
+        generation: String = "",
+        laneCount: Int = 0,
+        maxLaneCount: Int = 0,
+        tunneled: Bool = false
+    ) {
+        self.kind = kind
+        self.dataRate = dataRate
+        self.generation = generation
+        self.laneCount = laneCount
+        self.maxLaneCount = maxLaneCount
+        self.tunneled = tunneled
     }
 }
 
