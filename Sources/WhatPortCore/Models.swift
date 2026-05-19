@@ -29,6 +29,10 @@ public struct PortState: Identifiable, Sendable {
     // One entry per active transport on this port (USB3, DP, CIO).
     public var liveTransports: [LiveTransport] = []
 
+    // Display native resolution (from IOKit display data, if a display is connected)
+    public var displayWidth: Int = 0
+    public var displayHeight: Int = 0
+
     // A port is active if any data transport is running or something is
     // physically connected on the CC line (e.g. a charger).
     public var isActive: Bool {

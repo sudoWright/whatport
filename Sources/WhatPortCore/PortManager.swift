@@ -65,6 +65,11 @@ public final class PortManager: @unchecked Sendable {
     public var activePortCount: Int {
         ports.filter { $0.isActive }.count
     }
+
+    // Sum of watts across all ports that are sourcing/sinking power
+    public var totalWatts: Double {
+        ports.compactMap { $0.power?.watts }.reduce(0, +)
+    }
 }
 
 // MARK: - Snapshot input type (decoupled from IOKit raw types)
@@ -612,6 +617,8 @@ extension PortManager {
             // device on a TB/DP port is usually the hub, not the display.
             if let display = displaysByPort[portID] {
                 results[i].deviceName = display.productName
+                results[i].displayWidth = display.maxWidth
+                results[i].displayHeight = display.maxHeight
             } else if let device = devicesByPort[portID] {
                 results[i].deviceName = device.productName
                 if device.speedCode > 0 {
@@ -768,16 +775,14 @@ extension PortManager {
         chargerData: [ChargerInput],
         chargingPower: ChargingPowerInput? = nil
     ) -> [PortState] {
-        ccEntries.compactMap { cc in
-            guard cc.active else { return nil }
+        ccEntries.map { cc in
             let portType: PortType = cc.portType.lowercased().contains("magsafe") ? .magSafe : .usbC
 
-            // Only show live watts when battery is actively charging.
-            // When battery is full, leave power nil so the UI can show
-            // "battery full" instead of a misleading wattage number.
+            // Only show live watts when battery is actively charging
+            // and the port is connected.
             var power: PortPower?
             let batteryIsCharging = chargingPower?.isCharging ?? false
-            if batteryIsCharging, let cp = chargingPower, cp.systemPowerIn > 0 {
+            if cc.active && batteryIsCharging, let cp = chargingPower, cp.systemPowerIn > 0 {
                 power = PortPower(
                     watts: Double(cp.systemPowerIn) / 1000.0,
                     current: cp.systemCurrentIn,
@@ -791,7 +796,7 @@ extension PortManager {
             return PortState(
                 id: 100 + cc.portNumber,
                 portType: portType,
-                ccConnected: true,
+                ccConnected: cc.active,
                 power: power
             )
         }

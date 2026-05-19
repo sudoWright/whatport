@@ -11,65 +11,14 @@ struct PortDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                header
-                Divider()
+            VStack(alignment: .leading, spacing: 14) {
                 cardContent
             }
             .padding(16)
         }
-        .frame(width: 320)
     }
 
-    // MARK: - Header
-
-    private var header: some View {
-        HStack {
-            Circle()
-                .fill(protocolColor)
-                .frame(width: 10, height: 10)
-            Text(headerTitle)
-                .font(.headline)
-            Spacer()
-            Text(protocolLabel)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private var headerTitle: String {
-        if port.portType == .magSafe {
-            return "MagSafe"
-        }
-        return "Port \(port.id)"
-    }
-
-    private var protocolColor: Color {
-        switch port.primaryProtocol {
-        case .thunderbolt: return .purple
-        case .displayPort: return .orange
-        case .usbOnly: return .green
-        case .charging: return .yellow
-        case .idle: return .gray.opacity(0.4)
-        }
-    }
-
-    private var protocolLabel: String {
-        switch port.primaryProtocol {
-        case .thunderbolt:
-            if let tb = port.thunderboltLink {
-                return "\(tb.generation.label), \(tb.totalGbps) Gbps"
-            }
-            return "Thunderbolt"
-        case .displayPort: return "DisplayPort"
-        case .usbOnly: return "USB"
-        case .charging:
-            if fullyCharged { return "Battery Full" }
-            if isCharging { return "Charging" }
-            return "Charger Connected"
-        case .idle: return "idle"
-        }
-    }
+    private var chartTint: Color { .blue }
 
     // MARK: - Card Content (protocol-specific ordering)
 
@@ -78,52 +27,100 @@ struct PortDetailView: View {
         switch port.primaryProtocol {
         case .charging:
             powerSection
-            if !powerHistory.isEmpty { powerChart }
+            if !powerHistory.isEmpty {
+                Divider()
+                powerChart
+            }
             if port.portType != .magSafe {
+                Divider()
                 laneInfoSection
                 if let cap = port.thunderboltCapability {
+                    Divider()
                     thunderboltSection(capability: cap, link: port.thunderboltLink)
                 }
-                if let cable = port.cable { cableSection(cable) }
+                if let cable = port.cable {
+                    Divider()
+                    cableSection(cable)
+                }
             }
 
         case .usbOnly:
-            if let device = port.usbDevice { deviceSection(device) }
-            powerSection
-            if !powerHistory.isEmpty { powerChart }
+            if let device = port.usbDevice {
+                deviceSection(device)
+                Divider()
+            }
             laneInfoSection
             if let cap = port.thunderboltCapability {
+                Divider()
                 thunderboltSection(capability: cap, link: port.thunderboltLink)
             }
-            if let cable = port.cable { cableSection(cable) }
+            if let cable = port.cable {
+                Divider()
+                cableSection(cable)
+            }
+            Divider()
+            powerSection
+            if !powerHistory.isEmpty {
+                Divider()
+                powerChart
+            }
 
         case .thunderbolt:
-            if let device = port.usbDevice { deviceSection(device) }
+            if let device = port.usbDevice {
+                deviceSection(device)
+                Divider()
+            }
+            displayResolutionRow
             if let cap = port.thunderboltCapability {
                 thunderboltSection(capability: cap, link: port.thunderboltLink)
+                Divider()
             }
             laneInfoSection
+            if let cable = port.cable {
+                Divider()
+                cableSection(cable)
+            }
+            Divider()
             powerSection
-            if !powerHistory.isEmpty { powerChart }
-            if let cable = port.cable { cableSection(cable) }
+            if !powerHistory.isEmpty {
+                Divider()
+                powerChart
+            }
 
         case .displayPort:
-            if let device = port.usbDevice { deviceSection(device) }
+            if let device = port.usbDevice {
+                deviceSection(device)
+                Divider()
+            }
+            displayResolutionRow
             laneInfoSection
-            powerSection
-            if !powerHistory.isEmpty { powerChart }
             if let cap = port.thunderboltCapability {
+                Divider()
                 thunderboltSection(capability: cap, link: port.thunderboltLink)
             }
-            if let cable = port.cable { cableSection(cable) }
+            if let cable = port.cable {
+                Divider()
+                cableSection(cable)
+            }
+            Divider()
+            powerSection
+            if !powerHistory.isEmpty {
+                Divider()
+                powerChart
+            }
 
         case .idle:
             laneInfoSection
             if let cap = port.thunderboltCapability {
+                Divider()
                 thunderboltSection(capability: cap, link: port.thunderboltLink)
             }
+            Divider()
             powerSection
-            if !powerHistory.isEmpty { powerChart }
+            if !powerHistory.isEmpty {
+                Divider()
+                powerChart
+            }
         }
     }
 
@@ -132,8 +129,8 @@ struct PortDetailView: View {
     private func deviceSection(_ device: USBDeviceInfo) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Device")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.secondary)
 
             HStack {
                 Text(device.productName)
@@ -161,10 +158,10 @@ struct PortDetailView: View {
             if let serial = device.serialNumber {
                 HStack {
                     Text("Serial")
-                        .font(.caption)
+                        .font(.footnote)
                         .foregroundStyle(.tertiary)
                     Text(serial)
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -173,13 +170,25 @@ struct PortDetailView: View {
         }
     }
 
+    // MARK: - Display Resolution
+
+    @ViewBuilder
+    private var displayResolutionRow: some View {
+        if port.displayWidth > 0 && port.displayHeight > 0 {
+            LabeledValue(
+                label: "Native Resolution",
+                value: "\(port.displayWidth) x \(port.displayHeight)"
+            )
+        }
+    }
+
     // MARK: - Lanes + Stats (combined)
 
     private var laneInfoSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Lanes")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
+            Text("Lanes (live)")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.secondary)
             LaneBar(
                 label: "Lane 0",
                 state: port.lane0,
@@ -209,13 +218,13 @@ struct PortDetailView: View {
 
         return HStack(spacing: 4) {
             Text("\(stats.connectCount) connections")
-                .font(.caption)
+                .font(.footnote)
                 .foregroundStyle(.secondary)
             Text("\u{00B7}")
-                .font(.caption)
+                .font(.footnote)
                 .foregroundStyle(.tertiary)
             Text(errorSummary(stats, total: errorCount))
-                .font(.caption)
+                .font(.footnote)
                 .foregroundColor(errorCount > 0 ? .orange : .gray)
         }
     }
@@ -243,13 +252,13 @@ struct PortDetailView: View {
     private var powerSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Power")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.secondary)
 
             if let power = port.power {
                 HStack {
                     Text(String(format: "%.1fW", power.watts))
-                        .font(.system(.title3, design: .rounded, weight: .medium))
+                        .font(.system(.title2, design: .rounded, weight: .semibold))
                     Text("(\(power.current) mA @ \(power.voltage) mV)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -269,11 +278,11 @@ struct PortDetailView: View {
             } else if !powerMeteringAvailable {
                 Text("Power metering unavailable on this hardware")
                     .font(.subheadline)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             } else {
                 Text("Not sourcing power")
                     .font(.subheadline)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -281,14 +290,32 @@ struct PortDetailView: View {
     // MARK: - Power Chart
 
     private var powerChart: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Power (60s)")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.secondary)
             Chart(powerHistory.indices, id: \.self) { index in
                 let sample = powerHistory[index]
+                AreaMark(
+                    x: .value("Time", index),
+                    y: .value("Watts", sample.watts)
+                )
+                .foregroundStyle(
+                    .linearGradient(
+                        colors: [
+                            chartTint.opacity(port.isActive ? 0.25 : 0.05),
+                            chartTint.opacity(0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .interpolationMethod(.catmullRom)
                 LineMark(
                     x: .value("Time", index),
                     y: .value("Watts", sample.watts)
                 )
-                .foregroundStyle(.purple.opacity(port.isActive ? 0.7 : 0.2))
+                .foregroundStyle(chartTint.opacity(port.isActive ? 0.7 : 0.2))
                 .interpolationMethod(.catmullRom)
             }
             .chartXAxis(.hidden)
@@ -297,7 +324,7 @@ struct PortDetailView: View {
                     AxisValueLabel {
                         if let w = value.as(Double.self) {
                             Text(String(format: "%.0fW", w))
-                                .font(.system(size: 11))
+                                .font(.system(size: 12))
                         }
                     }
                 }
@@ -306,8 +333,8 @@ struct PortDetailView: View {
             .overlay {
                 if !port.isActive && !powerHistory.isEmpty {
                     Text("disconnected")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -321,8 +348,8 @@ struct PortDetailView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Thunderbolt")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.secondary)
 
             if let link {
                 let lanes = formatLanes(tx: link.txLanes, rx: link.rxLanes)
@@ -359,8 +386,8 @@ struct PortDetailView: View {
     private func cableSection(_ cable: CableInfo) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Cable")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.secondary)
             HStack(spacing: 12) {
                 LabeledValue(label: "Type", value: cable.productType)
                 if cable.pdRevision > 0 {
@@ -405,18 +432,18 @@ struct LaneBar: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 42, alignment: .trailing)
 
-            RoundedRectangle(cornerRadius: 3)
-                .fill(barColor)
-                .frame(height: 18)
+            RoundedRectangle(cornerRadius: 5)
+                .fill(barFill)
+                .frame(height: 22)
                 .overlay {
-                    HStack(spacing: 3) {
+                    HStack(spacing: 4) {
                         Text(barLabel)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(barTextColor)
                         if let lt = liveTransport, lt.tunneled {
                             Text("tunnel")
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.6))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(barTextColor.opacity(0.5))
                         }
                     }
                 }
@@ -428,18 +455,25 @@ struct LaneBar: View {
         return isLanePowered ? .green : .gray.opacity(0.3)
     }
 
-    private var barColor: Color {
-        let base: Color = switch state.transport {
-        case .thunderbolt: .purple
-        case .displayPort: .orange
-        case .usb: .green
-        case .idle: .gray.opacity(0.15)
+    // Muted tinted fill instead of solid color
+    private var barFill: Color {
+        let opacity = isLanePowered ? 0.12 : 0.06
+        switch state.transport {
+        case .thunderbolt: return .blue.opacity(opacity)
+        case .displayPort: return .orange.opacity(opacity)
+        case .usb: return .green.opacity(opacity)
+        case .idle: return Color.primary.opacity(0.04)
         }
-        // Dim the bar when the lane is allocated but not powered
-        if state.transport != .idle && !isLanePowered {
-            return base.opacity(0.35)
+    }
+
+    // Colored text on muted background instead of white on solid
+    private var barTextColor: Color {
+        switch state.transport {
+        case .thunderbolt: return .blue
+        case .displayPort: return .orange
+        case .usb: return .green
+        case .idle: return .clear
         }
-        return base
     }
 
     private var barLabel: String {
@@ -500,14 +534,14 @@ struct USB2Bar: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 48, alignment: .trailing)
 
-            RoundedRectangle(cornerRadius: 3)
-                .fill(active ? Color.green.opacity(0.7) : Color.gray.opacity(0.15))
-                .frame(height: 18)
+            RoundedRectangle(cornerRadius: 5)
+                .fill(active ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
+                .frame(height: 22)
                 .overlay {
                     if active {
                         Text("480 Mbps")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.green)
                     }
                 }
         }
@@ -521,13 +555,13 @@ struct LabeledValue: View {
     let value: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-            Text(value)
-                .font(.subheadline)
+                .font(.footnote)
                 .foregroundStyle(.secondary)
+            Text(value)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.primary)
         }
     }
 }

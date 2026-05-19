@@ -7,7 +7,6 @@ import WhatPortIOKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
-    private var settingsWindow: NSWindow?
     private let portManager = PortManager()
     private let dataSource = LivePortDataSource()
     private var dataTask: Task<Void, Never>?
@@ -55,14 +54,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupPopover() {
         let popover = NSPopover()
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 320, height: 200)
+        popover.contentSize = NSSize(width: 320, height: 560)
 
         if isSupported {
             popover.contentViewController = NSHostingController(
-                rootView: PortListView(
-                    portManager: portManager,
-                    onSettings: { [weak self] in self?.showSettings() }
-                )
+                rootView: PortListView(portManager: portManager)
             )
         } else {
             popover.contentViewController = NSHostingController(
@@ -109,31 +105,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func showSettings() {
-        // Close the popover so it doesn't overlap
-        popover?.performClose(nil)
-
-        if let existing = settingsWindow, existing.isVisible {
-            existing.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
-        }
-
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 100),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "WhatPort Settings"
-        window.contentViewController = NSHostingController(rootView: SettingsView())
-        window.center()
-        window.isReleasedWhenClosed = false
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        settingsWindow = window
-    }
-
     @objc private func togglePopover() {
         guard let popover, let button = statusItem?.button else { return }
 
@@ -141,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             popover.performClose(nil)
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 }

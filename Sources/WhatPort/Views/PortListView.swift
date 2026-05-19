@@ -3,12 +3,14 @@ import WhatPortCore
 
 struct PortListView: View {
     var portManager: PortManager
-    var onSettings: (() -> Void)?
     @State private var selectedPortID: Int?
+    @State private var showingSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
-            if let selectedID = selectedPortID,
+            if showingSettings {
+                settingsPanel
+            } else if let selectedID = selectedPortID,
                let port = portManager.ports.first(where: { $0.id == selectedID }) {
                 detailView(port: port)
             } else {
@@ -27,28 +29,38 @@ struct PortListView: View {
 
             if portManager.ports.isEmpty {
                 emptyState
+                Spacer()
             } else {
-                portList
+                ScrollView {
+                    portList
+                }
             }
-
             Divider()
             footer
         }
+        .frame(height: 420)
     }
 
     private var header: some View {
-        HStack {
+        HStack(alignment: .center) {
             Text("Ports")
-                .font(.headline)
+                .font(.title3.weight(.semibold))
             Spacer()
             if portManager.portCount > 0 {
-                Text("\(portManager.activePortCount)/\(portManager.portCount) active")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("\(portManager.activePortCount)/\(portManager.portCount) active")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    if portManager.totalWatts > 0 {
+                        Text(String(format: "%.1fW total", portManager.totalWatts))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 16)
     }
 
     private var emptyState: some View {
@@ -65,7 +77,7 @@ struct PortListView: View {
     }
 
     private var portList: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 4) {
             ForEach(portManager.ports) { port in
                 PortRowView(
                     port: port,
@@ -74,7 +86,9 @@ struct PortListView: View {
                 )
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    selectedPortID = port.id
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedPortID = port.id
+                    }
                 }
             }
         }
@@ -82,25 +96,29 @@ struct PortListView: View {
     }
 
     private var footer: some View {
-        HStack {
-            Button("Quit") {
+        HStack(alignment: .center) {
+            Button {
                 NSApplication.shared.terminate(nil)
+            } label: {
+                Text("Quit")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
             Spacer()
-            if let onSettings {
-                Button(action: onSettings) {
-                    Image(systemName: "gear")
-                        .font(.subheadline)
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showingSettings = true
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+            } label: {
+                Image(systemName: "gear")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
             }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.vertical, 14)
     }
 
     // MARK: - Detail View
@@ -108,12 +126,17 @@ struct PortListView: View {
     private func detailView(port: PortState) -> some View {
         VStack(spacing: 0) {
             HStack {
-                Button(action: { selectedPortID = nil }) {
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedPortID = nil
+                    }
+                }) {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
                         Text("Back")
                     }
-                    .font(.subheadline)
+                    .font(.body)
+                    .frame(minHeight: 32)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
@@ -132,6 +155,36 @@ struct PortListView: View {
                 fullyCharged: portManager.fullyCharged
             )
         }
+        .frame(height: 560)
+    }
+    // MARK: - Settings Panel
+
+    private var settingsPanel: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingSettings = false
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("Back")
+                    }
+                    .font(.body)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+
+            Divider()
+
+            SettingsView()
+        }
+        .frame(height: 420)
     }
 }
 
@@ -141,30 +194,77 @@ struct PortRowView: View {
     let port: PortState
     var isCharging: Bool = false
     var fullyCharged: Bool = false
+    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: 10) {
             protocolIndicator
-            VStack(alignment: .leading, spacing: 2) {
-                Text(portLabel)
-                    .font(.body.weight(.medium))
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Text(titleText)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(port.isActive ? .primary : .tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    // Show port number next to device name so you know which port
+                    if port.deviceName != nil && port.isActive {
+                        Text(portLabel)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Text(summaryText)
                     .font(.subheadline)
-                    .foregroundStyle(port.isActive ? .secondary : .tertiary)
+                    .foregroundStyle(port.isActive ? .secondary : .quaternary)
+                    .lineLimit(1)
             }
-            Spacer()
+            Spacer(minLength: 4)
             if let power = port.power {
                 Text(formatWatts(power.watts))
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
             }
             Image(systemName: "chevron.right")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
+                .font(.caption)
+                .foregroundStyle(isHovered ? .tertiary : .quaternary)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .opacity(port.isActive ? 1.0 : 0.5)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background {
+            if port.isActive || isHovered {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(rowFill)
+            }
+        }
+        .overlay {
+            if port.isActive || isHovered {
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+            }
+        }
+        .padding(.horizontal, 6)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+    }
+
+    // Neutral gray cards. No protocol color in the fill.
+    private var rowFill: Color {
+        if isHovered {
+            return Color.primary.opacity(0.08)
+        }
+        return Color.primary.opacity(0.04)
+    }
+
+    // When a device is connected, promote its name to the title line.
+    // Falls back to the port label (Port 1, MagSafe, etc).
+    private var titleText: String {
+        if let device = port.deviceName, port.isActive {
+            return device
+        }
+        return portLabel
     }
 
     private var portLabel: String {
@@ -177,12 +277,12 @@ struct PortRowView: View {
     private var protocolIndicator: some View {
         Circle()
             .fill(indicatorColor)
-            .frame(width: 10, height: 10)
+            .frame(width: 12, height: 12)
     }
 
     private var indicatorColor: Color {
         switch port.primaryProtocol {
-        case .thunderbolt: return .purple
+        case .thunderbolt: return .blue
         case .displayPort: return .orange
         case .usbOnly: return .green
         case .charging: return .yellow
@@ -190,51 +290,46 @@ struct PortRowView: View {
         }
     }
 
+    // Protocol and speed only. Device name is in the title now,
+    // so this line stays short enough to fit without truncation.
     private var summaryText: String {
         guard port.isActive else { return "idle" }
 
-        // Device name prefix (e.g. "Game Drive, ")
-        let device = port.deviceName.map { "\($0), " } ?? ""
-
         if let tb = port.thunderboltLink {
             let lanes = formatLanes(tx: tb.txLanes, rx: tb.rxLanes)
-            return "\(device)\(tb.generation.label) \(lanes), \(tb.totalGbps) Gbps"
+            return "\(tb.generation.label) \(lanes), \(tb.totalGbps) Gbps"
         }
 
         if port.lane0.transport == .displayPort || port.lane1.transport == .displayPort {
             let dpLive = port.liveTransports.first { $0.kind == .displayPort }
             if let dp = dpLive, !dp.dataRate.isEmpty {
                 let lanes = dp.laneCount > 0 ? ", \(dp.laneCount) lane\(dp.laneCount > 1 ? "s" : "")" : ""
-                return "\(device)DP alt-mode, \(dp.dataRate)\(lanes)"
+                return "DP alt-mode, \(dp.dataRate)\(lanes)"
             }
             let dpLanes = [port.lane0, port.lane1].filter { $0.transport == .displayPort }.count
-            return "\(device)DP alt-mode, \(dpLanes) lane\(dpLanes > 1 ? "s" : "")"
+            return "DP alt-mode, \(dpLanes) lane\(dpLanes > 1 ? "s" : "")"
         }
 
         if port.lane0.transport == .usb || port.lane1.transport == .usb {
             let usbLive = port.liveTransports.first { $0.kind == .usb }
             if let usb = usbLive, !usb.dataRate.isEmpty {
-                return "\(device)USB3, \(usb.dataRate)"
+                return "USB3, \(usb.dataRate)"
             }
             let speed = port.usbSpeed?.label ?? "5 Gbps"
-            return "\(device)USB3, \(speed)"
+            return "USB3, \(speed)"
         }
 
         if port.usb2Active {
-            return "\(device)USB2, 480 Mbps"
+            return "USB2, 480 Mbps"
         }
 
         if port.ccConnected {
             if port.primaryProtocol == .charging {
-                if fullyCharged {
-                    return "Charger Connected, Battery Full"
-                }
-                if isCharging {
-                    return "Charger Connected, Battery Charging"
-                }
+                if fullyCharged { return "Battery Full" }
+                if isCharging { return "Charging" }
                 return "Charger Connected"
             }
-            return "\(device)connected"
+            return "connected"
         }
 
         return "active"
