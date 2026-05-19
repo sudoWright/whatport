@@ -382,7 +382,7 @@ public struct LiveTransport: Sendable, Equatable {
 
 // MARK: - Protocol Classification
 
-public enum PortProtocol: Sendable, Equatable {
+public enum PortProtocol: Sendable, Equatable, Codable {
     case thunderbolt
     case displayPort
     case usbOnly

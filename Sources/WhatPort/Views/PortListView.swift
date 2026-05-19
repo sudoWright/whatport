@@ -1,14 +1,18 @@
 import SwiftUI
 import WhatPortCore
+import WhatPortAppKit
 
 struct PortListView: View {
     var portManager: PortManager
+    var footerContext: FooterContext
     @State private var selectedPortID: Int?
     @State private var showingSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
-            if showingSettings {
+            if let panelIndex = footerContext.showingPanelIndex {
+                pluginPanel(index: panelIndex)
+            } else if showingSettings {
                 settingsPanel
             } else if let selectedID = selectedPortID,
                let port = portManager.ports.first(where: { $0.id == selectedID }) {
@@ -18,6 +22,21 @@ struct PortListView: View {
             }
         }
         .frame(width: 320)
+    }
+
+    // MARK: - Plugin panel (e.g. Pro upsell)
+
+    @ViewBuilder
+    private func pluginPanel(index: Int) -> some View {
+        let panels = PluginRegistry.shared.panelBuilders
+        if index < panels.count {
+            panels[index]({
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    self.footerContext.dismissPanel()
+                }
+            })
+            .frame(height: 420)
+        }
     }
 
     // MARK: - List View
@@ -106,6 +125,15 @@ struct PortListView: View {
             }
             .buttonStyle(.plain)
             Spacer()
+
+            // Plugin footer buttons (Flight Recorder, etc.)
+            ForEach(
+                Array(PluginRegistry.shared.footerButtonBuilders.enumerated()),
+                id: \.offset
+            ) { _, builder in
+                builder(footerContext)
+            }
+
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     showingSettings = true

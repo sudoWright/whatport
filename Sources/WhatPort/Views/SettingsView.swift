@@ -1,5 +1,6 @@
 import SwiftUI
 import ServiceManagement
+import WhatPortAppKit
 
 struct SettingsView: View {
     // SMAppService.mainApp manages the "Launch at Login" state.
@@ -26,6 +27,14 @@ struct SettingsView: View {
             .padding(.top, 16)
 
             Spacer()
+
+            // Plugin settings sections (license status, dev override, etc.)
+            ForEach(
+                Array(PluginRegistry.shared.settingsSections.enumerated()),
+                id: \.offset
+            ) { _, builder in
+                builder()
+            }
 
             // About
             Divider()

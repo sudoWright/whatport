@@ -4,3 +4,6 @@
 xcuserdata/
 DerivedData/
 .DS_Store
+.claude/
+default.profraw
+.env

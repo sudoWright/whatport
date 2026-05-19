@@ -22,6 +22,11 @@ public final class PortManager: @unchecked Sendable {
 
     private let maxPowerSamples = 20
 
+    // Port recorder: stores long-running history and events.
+    // When nil, recording is disabled (no-op). Set by the Pro plugin
+    // via PluginRegistry's portManagerHooks.
+    public var recorder: (any PortRecorder)?
+
     public init() {}
 
     // Called by the IOKit layer (or mock) whenever new data arrives.
@@ -45,6 +50,10 @@ public final class PortManager: @unchecked Sendable {
             dpTransport: snapshot.dpTransport,
             cioTransport: snapshot.cioTransport
         )
+
+        // Flight Recorder: record before updating published state so the
+        // recorder can diff old ports vs new correlated ports.
+        recorder?.recordSnapshot(ports: correlated, timestamp: snapshot.timestamp)
 
         portCount = correlated.count
 

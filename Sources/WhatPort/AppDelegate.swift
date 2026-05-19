@@ -2,6 +2,8 @@ import AppKit
 import SwiftUI
 import WhatPortCore
 import WhatPortIOKit
+import WhatPortAppKit
+import WhatPortPlugins
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -21,6 +23,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         isSupported = HardwareCheck.isAppleSilicon()
 
+        // Register Pro plugins (no-op in the OSS build)
+        bootstrapPlugins(registry: .shared)
+
+        // Run plugin launch hooks (licence bootstrap, StoreKit, etc.)
+        let registry = PluginRegistry.shared
+        Task {
+            for hook in registry.launchHooks {
+                await hook()
+            }
+        }
+
+        // Run plugin portManager hooks (attach recorder, observers, etc.)
+        for hook in registry.portManagerHooks {
+            hook(portManager)
+        }
+
         setupStatusItem()
         setupPopover()
 
@@ -33,6 +51,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         dataTask?.cancel()
         dataSource.stop()
+
+        // Run plugin teardown hooks
+        for hook in PluginRegistry.shared.teardownHooks {
+            hook()
+        }
     }
 
     private func setupStatusItem() {
@@ -56,9 +79,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.behavior = .transient
         popover.contentSize = NSSize(width: 320, height: 560)
 
+        let footerContext = FooterContext(portManager: portManager)
+        footerContext.dismissPopover = { [weak self] in
+            self?.popover?.performClose(nil)
+        }
+
         if isSupported {
             popover.contentViewController = NSHostingController(
-                rootView: PortListView(portManager: portManager)
+                rootView: PortListView(
+                    portManager: portManager,
+                    footerContext: footerContext
+                )
             )
         } else {
             popover.contentViewController = NSHostingController(
