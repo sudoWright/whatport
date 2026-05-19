@@ -1,0 +1,930 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WhatPort: Real-time USB-C port monitoring for Mac</title>
+    <meta
+      name="description"
+      content="See what every USB-C port on your Mac is doing right now. Protocol, speed, lane status, and live power monitoring in a lightweight menu bar app. Free, open source, Apple Silicon."
+    >
+    <link rel="canonical" href="https://www.whatport.app/">
+    <link rel="icon" href="icon.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.whatport.app/">
+    <meta property="og:title" content="WhatPort: Real-time USB-C port monitoring for Mac">
+    <meta property="og:description" content="See what every USB-C port on your Mac is doing. Protocol detection, live lane status, and power monitoring in a menu bar app.">
+    <meta property="og:image" content="https://www.whatport.app/screenshot-list.webp">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="WhatPort: Real-time USB-C port monitoring for Mac">
+    <meta name="twitter:description" content="See what every USB-C port on your Mac is doing. Protocol detection, live lane status, and power monitoring in a menu bar app.">
+    <meta name="twitter:image" content="https://www.whatport.app/screenshot-list.webp">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "WhatPort",
+      "operatingSystem": "macOS 14+",
+      "applicationCategory": "UtilitiesApplication",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "GBP"
+      },
+      "description": "Real-time USB-C port monitoring for Mac. See protocol, speed, lane status, and power for every port.",
+      "url": "https://www.whatport.app",
+      "downloadUrl": "https://github.com/darrylmorley/whatport/releases/latest",
+      "softwareVersion": "1.0.0",
+      "author": {
+        "@type": "Person",
+        "name": "Darryl Morley",
+        "url": "https://github.com/darrylmorley"
+      },
+      "license": "https://opensource.org/licenses/MIT"
+    }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #0e1620;
+        --ink-soft: #364152;
+        --muted: #6a7585;
+        --line: #e3e8ef;
+        --line-soft: #eef2f7;
+        --bg: #fafbfc;
+        --panel: #ffffff;
+        --accent: #2563eb;
+        --accent-strong: #1d4ed8;
+        --accent-soft: #eff6ff;
+        --good: #0b8a5a;
+        --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+        --shadow-md: 0 6px 16px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
+        --shadow-lg: 0 24px 50px rgba(15, 23, 42, 0.18);
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 16px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      a { color: inherit; text-decoration: none; }
+      img { display: block; max-width: 100%; }
+
+      .wrap {
+        width: min(1120px, calc(100% - 40px));
+        margin: 0 auto;
+      }
+
+      h1, h2, h3, p { margin: 0; }
+
+      /* Nav */
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(250, 251, 252, 0.85);
+        backdrop-filter: saturate(180%) blur(12px);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .nav-inner {
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 16px;
+        color: var(--ink);
+      }
+
+      .mark {
+        width: 28px;
+        height: 28px;
+        display: block;
+        border-radius: 7px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        font-size: 14px;
+        color: var(--ink-soft);
+      }
+
+      .nav-links a:hover { color: var(--ink); }
+
+      /* Buttons */
+      .button {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 18px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 15px;
+        line-height: 1;
+        cursor: pointer;
+        transition: transform 0.06s ease, background 0.15s ease, border-color 0.15s ease;
+      }
+
+      .button:active { transform: translateY(1px); }
+
+      .button.primary {
+        background: var(--ink);
+        color: #fff;
+      }
+      .button.primary:hover { background: #1c2735; }
+
+      .button.secondary {
+        background: var(--panel);
+        color: var(--ink);
+        border-color: var(--line);
+      }
+      .button.secondary:hover { border-color: #c8d0db; }
+
+      .button .arrow { transition: transform 0.15s ease; }
+      .button:hover .arrow { transform: translateX(2px); }
+
+      .nav .button { padding: 8px 14px; min-height: 36px; font-size: 14px; text-decoration: none; }
+      .nav .button.secondary { background: var(--panel); color: var(--ink); border-color: var(--line); }
+
+      /* Hero */
+      .hero {
+        padding: 80px 0 60px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(ellipse 60% 50% at 80% 0%, rgba(37, 99, 235, 0.08), transparent 60%),
+          radial-gradient(ellipse 50% 40% at 20% 100%, rgba(37, 99, 235, 0.04), transparent 60%);
+        pointer-events: none;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+        gap: 64px;
+        align-items: center;
+        position: relative;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 22px;
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--panel);
+        color: var(--ink-soft);
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      .eyebrow .dot-accent {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+
+      h1 {
+        font-size: clamp(38px, 5.2vw, 56px);
+        line-height: 1.06;
+        letter-spacing: -0.02em;
+        font-weight: 800;
+        color: var(--ink);
+        margin-bottom: 20px;
+      }
+
+      h1 .accent { color: var(--accent); }
+
+      .hero p.lede {
+        font-size: clamp(17px, 1.4vw, 19px);
+        color: var(--ink-soft);
+        max-width: 540px;
+        margin-bottom: 28px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 28px;
+      }
+
+      .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px 22px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .meta-row span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .meta-row svg { color: var(--good); }
+
+      .hero-shot {
+        position: relative;
+        justify-self: center;
+      }
+
+      .hero-shot::after {
+        content: "";
+        position: absolute;
+        inset: -40px;
+        z-index: -1;
+        background: radial-gradient(ellipse at center, rgba(37, 99, 235, 0.12), transparent 65%);
+        filter: blur(20px);
+      }
+
+      .hero-shot img {
+        width: 100%;
+        max-width: 340px;
+        border-radius: 14px;
+        box-shadow: var(--shadow-lg);
+      }
+
+      /* Sections */
+      section { padding: 88px 0; }
+
+      .section-head {
+        max-width: 680px;
+        margin-bottom: 48px;
+      }
+
+      .section-tag {
+        display: inline-block;
+        margin-bottom: 14px;
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        font-size: clamp(28px, 3.6vw, 40px);
+        line-height: 1.1;
+        letter-spacing: -0.01em;
+        font-weight: 700;
+        margin-bottom: 16px;
+      }
+
+      .section-head p {
+        color: var(--ink-soft);
+        font-size: 17px;
+      }
+
+      /* Protocol cards */
+      .protocol { border-bottom: 1px solid var(--line); }
+
+      .protocol-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 24px;
+      }
+
+      .protocol-card {
+        padding: 24px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .protocol-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 6px;
+      }
+
+      .protocol-card .proto-name {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+      }
+
+      .protocol-card p {
+        color: var(--ink-soft);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      /* Features */
+      .features { background: var(--panel); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1px;
+        background: var(--line);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+
+      .feature {
+        padding: 32px 28px;
+        background: var(--panel);
+      }
+
+      .feature .icon {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        margin-bottom: 18px;
+        border-radius: 10px;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .feature h3 {
+        font-size: 17px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .feature p {
+        color: var(--ink-soft);
+        font-size: 14.5px;
+        line-height: 1.55;
+      }
+
+      /* Screenshots */
+      .screenshots { border-bottom: 1px solid var(--line); }
+
+      .screenshot-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 32px;
+        justify-items: center;
+      }
+
+      .screenshot-grid img {
+        width: 100%;
+        max-width: 300px;
+        border-radius: 14px;
+        box-shadow: var(--shadow-md);
+      }
+
+      .screenshot-grid figcaption {
+        text-align: center;
+        margin-top: 14px;
+        font-size: 14px;
+        color: var(--muted);
+        font-weight: 500;
+      }
+
+      /* How it works */
+      .how-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 32px;
+      }
+
+      .how-card {
+        padding: 28px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .how-card .step {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 14px;
+      }
+
+      .how-card h3 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .how-card p {
+        color: var(--ink-soft);
+        font-size: 14.5px;
+        line-height: 1.55;
+      }
+
+      .how-card code {
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: var(--line-soft);
+        font-size: 13px;
+      }
+
+      /* FAQ */
+      .faq { border-top: 1px solid var(--line); }
+
+      .faq-list { max-width: 720px; }
+
+      .faq-item {
+        padding: 24px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .faq-item:first-child { border-top: 1px solid var(--line); }
+
+      .faq-item h3 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .faq-item p {
+        color: var(--ink-soft);
+        font-size: 15px;
+        line-height: 1.6;
+      }
+
+      /* Install */
+      .install { background: #0c1219; color: #fff; }
+      .install .section-tag { color: #60a5fa; }
+      .install h2 { color: #fff; }
+      .install .section-head p { color: rgba(255, 255, 255, 0.7); }
+
+      .install-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 48px;
+        align-items: start;
+      }
+
+      .install-card {
+        padding: 28px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .install-card-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 14px;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.7);
+        font-weight: 500;
+      }
+
+      .install-card-label svg { color: #60a5fa; }
+
+      .install-card p {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 14.5px;
+        margin-bottom: 18px;
+        line-height: 1.55;
+      }
+
+      .install-card pre {
+        margin: 0 0 18px;
+        padding: 16px 18px;
+        background: rgba(0, 0, 0, 0.35);
+        border-radius: 8px;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 13.5px;
+        color: #d7e7f5;
+        overflow-x: auto;
+        line-height: 1.7;
+      }
+
+      .install-card .button.primary {
+        background: #fff;
+        color: #0c1219;
+        width: 100%;
+      }
+      .install-card .button.primary:hover { background: #e8eef5; }
+
+      .install .meta-row { color: rgba(255, 255, 255, 0.65); margin-top: 24px; }
+      .install .meta-row svg { color: #60a5fa; }
+
+      /* Footer */
+      footer {
+        padding: 32px 0;
+        background: #0c1219;
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 13.5px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      footer .wrap {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      footer a { color: rgba(255, 255, 255, 0.85); }
+      footer a:hover { color: #fff; }
+
+      /* Responsive */
+      @media (max-width: 900px) {
+        .hero { padding: 56px 0 32px; }
+        .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+        .hero-shot { order: -1; }
+        .hero-shot img { max-width: 280px; margin: 0 auto; }
+        section { padding: 64px 0; }
+        .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .protocol-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .how-grid { grid-template-columns: 1fr; }
+        .install-grid { grid-template-columns: 1fr; gap: 32px; }
+        .screenshot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+      }
+
+      @media (max-width: 560px) {
+        .nav-links a:not(.button) { display: none; }
+        .nav-links { gap: 12px; }
+        .nav .button { padding: 8px 12px; font-size: 13px; }
+        .feature-grid { grid-template-columns: 1fr; }
+        .protocol-grid { grid-template-columns: 1fr; }
+        .screenshot-grid { grid-template-columns: 1fr; }
+        .screenshot-grid img { max-width: 260px; }
+        .actions { width: 100%; flex-direction: column; }
+        .actions .button { width: 100%; }
+        .hero-shot img { max-width: 100%; }
+        h1 { font-size: 32px; }
+        h2 { font-size: 24px; }
+        .section-head { margin-bottom: 32px; }
+        section { padding: 48px 0; }
+        footer .wrap { flex-direction: column; align-items: flex-start; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="nav" aria-label="Primary">
+      <div class="wrap nav-inner">
+        <a class="brand" href="/">
+          <img class="mark" src="icon.png" alt="" aria-hidden="true" width="28" height="28">
+          <span>WhatPort</span>
+        </a>
+        <div class="nav-links">
+          <a href="#features">Features</a>
+          <a href="#how">How it works</a>
+          <a href="#install">Install</a>
+          <a class="button secondary" href="https://github.com/darrylmorley/whatport">GitHub</a>
+        </div>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">
+            <span class="dot-accent" aria-hidden="true"></span>
+            macOS menu bar utility
+          </span>
+          <h1>See what your USB-C ports are <span class="accent">actually doing.</span></h1>
+          <p class="lede">
+            WhatPort shows the protocol, speed, lane status, and power draw
+            for every USB-C and Thunderbolt port on your Mac. Real-time data,
+            no guessing.
+          </p>
+          <div class="actions">
+            <a class="button primary" href="https://github.com/darrylmorley/whatport/releases/latest">
+              Download for macOS
+              <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </a>
+            <a class="button secondary" href="https://github.com/darrylmorley/whatport">View source</a>
+          </div>
+          <div class="meta-row">
+            <span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+              Free and open source
+            </span>
+            <span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+              Apple Silicon, macOS 14+
+            </span>
+            <span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+              Signed and notarised
+            </span>
+          </div>
+        </div>
+        <div class="hero-shot">
+          <img src="screenshot-list.webp" alt="WhatPort menu bar showing connected USB-C devices with protocol and power info" width="340">
+        </div>
+      </div>
+    </header>
+
+    <section class="protocol">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="section-tag">Protocol detection</span>
+          <h2>Every port. Every protocol. At a glance.</h2>
+          <p>
+            WhatPort identifies what each port is carrying and colour-codes it so you can tell at a glance whether you're on Thunderbolt, DisplayPort, USB, or just charging.
+          </p>
+        </div>
+
+        <div class="protocol-grid">
+          <div class="protocol-card">
+            <div class="proto-name">
+              <span class="protocol-dot" style="background: #2563eb;" aria-hidden="true"></span>
+              Thunderbolt
+            </div>
+            <p>TB3, TB4, and TB5. Lane width, speed per lane, and link generation.</p>
+          </div>
+          <div class="protocol-card">
+            <div class="proto-name">
+              <span class="protocol-dot" style="background: #ea580c;" aria-hidden="true"></span>
+              DisplayPort
+            </div>
+            <p>DP alt-mode with lane count, link rate (HBR2, HBR3), and display resolution.</p>
+          </div>
+          <div class="protocol-card">
+            <div class="proto-name">
+              <span class="protocol-dot" style="background: #16a34a;" aria-hidden="true"></span>
+              USB
+            </div>
+            <p>USB 2.0 through USB 3.2 Gen 2x2. Device name, speed, and version.</p>
+          </div>
+          <div class="protocol-card">
+            <div class="proto-name">
+              <span class="protocol-dot" style="background: #eab308;" aria-hidden="true"></span>
+              Charging
+            </div>
+            <p>MagSafe and USB-C power delivery. Live watts, voltage, and current draw.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="features" id="features">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="section-tag">Features</span>
+          <h2>Everything your ports know, now you know too.</h2>
+          <p>
+            WhatPort reads real-time data from IOKit and turns it into
+            something you can actually understand. No terminal needed.
+          </p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature">
+            <div class="icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </div>
+            <h3>Live lane status</h3>
+            <p>See which lanes are carrying data and at what speed. Each lane shows its transport protocol and power state in real time.</p>
+          </article>
+
+          <article class="feature">
+            <div class="icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            </div>
+            <h3>Power monitoring</h3>
+            <p>Real-time wattage, voltage, and current for every port. A rolling 60-second graph shows power draw over time.</p>
+          </article>
+
+          <article class="feature">
+            <div class="icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01M14 12h.01M18 12h.01"/></svg>
+            </div>
+            <h3>Device identification</h3>
+            <p>Connected devices show product name, vendor, serial number, USB version, and current draw.</p>
+          </article>
+
+          <article class="feature">
+            <div class="icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            </div>
+            <h3>Display resolution</h3>
+            <p>Shows native resolution for connected monitors over Thunderbolt or DisplayPort alt-mode.</p>
+          </article>
+
+          <article class="feature">
+            <div class="icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <h3>Port health</h3>
+            <p>Lifetime connection counts and error tracking per port. Spot overcurrent events, link errors, and enumeration failures.</p>
+          </article>
+
+          <article class="feature">
+            <div class="icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <h3>Cable info</h3>
+            <p>Cable type (active/passive) and USB PD revision detected from the cable's e-marker data.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="screenshots">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="section-tag">Detail views</span>
+          <h2>Tap any port for the full picture.</h2>
+          <p>
+            Every port expands to show lanes, Thunderbolt capability, cable info,
+            power data, and a live power graph.
+          </p>
+        </div>
+
+        <div class="screenshot-grid">
+          <figure>
+            <img src="screenshot-detail-tb.webp" alt="Thunderbolt display detail showing lanes and power" width="300">
+            <figcaption>Thunderbolt display</figcaption>
+          </figure>
+          <figure>
+            <img src="screenshot-detail-usb.webp" alt="USB device detail with lane status and cable info" width="300">
+            <figcaption>USB device with power graph</figcaption>
+          </figure>
+          <figure>
+            <img src="screenshot-list.webp" alt="Port list overview" width="300">
+            <figcaption>Port overview</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="section-tag">How it works</span>
+          <h2>Three IOKit data sources, one clear picture.</h2>
+          <p>
+            WhatPort reads unprivileged IOKit services. No root access, no entitlements, no background daemon.
+          </p>
+        </div>
+
+        <div class="how-grid">
+          <div class="how-card">
+            <div class="step">1</div>
+            <h3>AppleTypeCPhy</h3>
+            <p>Reads USB-C lane state per PHY: which transport protocol each lane is carrying and whether the lane is powered on.</p>
+          </div>
+          <div class="how-card">
+            <div class="step">2</div>
+            <h3>IOThunderboltPort</h3>
+            <p>Reads Thunderbolt link speed, lane width, generation, and port capability. Socket ID maps to physical port number.</p>
+          </div>
+          <div class="how-card">
+            <div class="step">3</div>
+            <h3>AppleSmartBattery</h3>
+            <p>Reads power delivery data per port: watts, voltage, current, and PD contract details. Polled every 3 seconds.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="faq" id="faq">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="section-tag">FAQ</span>
+          <h2>Common questions.</h2>
+        </div>
+
+        <div class="faq-list">
+          <div class="faq-item">
+            <h3>Does it work on Intel Macs?</h3>
+            <p>No. WhatPort reads data from Apple Silicon-specific IOKit services (AppleTypeCPhy, IOPortTransportStateCC) that don't exist on Intel Macs. You need an M1 or later.</p>
+          </div>
+          <div class="faq-item">
+            <h3>Does it need root or special permissions?</h3>
+            <p>No. All IOKit reads are unprivileged. No entitlements, no System Extension, no background daemon. It runs as a regular menu bar app.</p>
+          </div>
+          <div class="faq-item">
+            <h3>Does it phone home?</h3>
+            <p>No. There are no analytics, no telemetry, and no network requests. The app reads local IOKit data and nothing else. The source is on GitHub if you want to verify.</p>
+          </div>
+          <div class="faq-item">
+            <h3>How is this different from WhatCable?</h3>
+            <p><a href="https://www.whatcable.uk" style="color: var(--accent);">WhatCable</a> focuses on cable identity: what a cable can do, its e-marker data, and charging diagnostics. WhatPort focuses on port status: what each port is doing right now, with live lane and power data.</p>
+          </div>
+          <div class="faq-item">
+            <h3>Why does my Thunderbolt 5 port show TB4?</h3>
+            <p>TB5 ports negotiate down to the connected device's capability. If your device only supports TB4, the port runs at TB4 speed. The Thunderbolt section shows both the active link and the port's maximum capability.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="install" id="install">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="section-tag">Install</span>
+          <h2>Download and go.</h2>
+          <p>
+            WhatPort is signed, notarised, and ready to run.
+            Requires macOS 14 (Sonoma) or later on Apple Silicon.
+          </p>
+        </div>
+
+        <div class="install-grid">
+          <div class="install-card">
+            <div class="install-card-label">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Download
+            </div>
+            <p>
+              Grab the latest <code style="background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 13px;">.zip</code> from GitHub Releases. Unzip and drag <strong style="color: #fff;">WhatPort.app</strong> into Applications.
+            </p>
+            <a class="button primary" href="https://github.com/darrylmorley/whatport/releases/latest">
+              Get the latest release
+            </a>
+          </div>
+
+          <div class="install-card">
+            <div class="install-card-label">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+              Build from source
+            </div>
+<pre>git clone https://github.com/darrylmorley/whatport.git
+cd whatport
+xcodebuild -scheme WhatPort \
+  -configuration Release \
+  -destination 'platform=macOS' build</pre>
+            <a class="button primary" href="https://github.com/darrylmorley/whatport">
+              View source on GitHub
+            </a>
+          </div>
+        </div>
+
+        <div class="meta-row">
+          <span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+            No root access needed
+          </span>
+          <span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+            No entitlements
+          </span>
+          <span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+            MIT licensed
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <span>Built by <a href="https://github.com/darrylmorley">Darryl Morley</a>. MIT licensed.</span>
+        <span>
+          <a href="https://github.com/darrylmorley/whatport">Source</a>
+          &nbsp;&middot;&nbsp;
+          <a href="https://github.com/darrylmorley/whatport/releases">Releases</a>
+          &nbsp;&middot;&nbsp;
+          <a href="https://www.whatcable.uk">WhatCable</a>
+        </span>
+      </div>
+    </footer>
+  </body>
+</html>
