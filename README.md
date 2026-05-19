@@ -27,6 +27,10 @@ Apple Silicon only (M1 and later).
 - **Port statistics** with lifetime connection counts and error tracking
 - **MagSafe support** with charging status and power draw
 
+## Install
+
+Download the latest release from the [releases page](https://github.com/darrylmorley/whatport/releases), unzip, and drag `WhatPort.app` to your Applications folder. The app is signed and notarized by Apple.
+
 ## Requirements
 
 - macOS 14.0 (Sonoma) or later
