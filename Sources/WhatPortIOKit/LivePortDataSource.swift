@@ -10,10 +10,14 @@ import WhatPortCore
 // values into. The consumer awaits values with `for await snapshot in stream`.
 //
 // Lifecycle:
-// 1. start() registers IOKit notifications and begins the power poll timer
+// 1. start() registers IOKit notifications and begins the 3s poll timer
 // 2. On notification (debounced): reads all state, yields a snapshot
-// 3. On poll tick (3s): reads power only, yields a snapshot
+// 3. On poll tick (3s): reads all state, yields a snapshot
 // 4. stop() cancels everything
+//
+// Notifications give sub-second response to plug/unplug events.
+// The poll timer catches everything else (power changes, transport
+// state updates) and acts as a safety net for any missed notifications.
 //
 // @unchecked Sendable: we manage thread safety manually via the serial queue
 // and nonisolated(unsafe) markers. The PortNotifier already dispatches on its
@@ -49,8 +53,9 @@ public final class LivePortDataSource: @unchecked Sendable, PortDataSource {
             self?.yieldSnapshot()
         }
 
-        // Start power polling (3-second interval)
-        startPowerPoll()
+        // Start polling (3-second interval). Reads all state, not just power.
+        // Acts as a safety net alongside notifications.
+        startPollTimer()
     }
 
     // Call this from the app layer when the system wakes from sleep.
@@ -74,7 +79,7 @@ public final class LivePortDataSource: @unchecked Sendable, PortDataSource {
         continuation?.yield(snapshot)
     }
 
-    private func startPowerPoll() {
+    private func startPollTimer() {
         pollTask?.cancel()
         pollTask = Task { [weak self] in
             while !Task.isCancelled {

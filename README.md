@@ -54,7 +54,7 @@ WhatPort reads real-time data from three IOKit service layers:
 2. **IOThunderboltPort** for Thunderbolt link speed, width, and capability
 3. **AppleSmartBattery** for power delivery data (watts, voltage, current per port)
 
-Connection events are detected via IOKit interest notifications on `IOPortTransportStateCC` services. Power data is polled every 3 seconds. No polling is done for connection state.
+Connection events are detected via IOKit interest notifications on `IOPortTransportStateCC` services for sub-second response. All state (connections, power, transports) is also polled every 3 seconds as a safety net.
 
 ## Architecture
 
