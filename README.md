@@ -9,9 +9,9 @@ A lightweight macOS menu bar utility that shows real-time USB-C and Thunderbolt 
 Apple Silicon only (M1 and later).
 
 <p align="center">
-  <img src="screenshots/port-list.png" width="280" alt="WhatPort port list showing connected devices">
-  <img src="screenshots/detail-thunderbolt.png" width="280" alt="Thunderbolt display detail with lane status">
-  <img src="screenshots/detail-usb-power.png" width="280" alt="USB device detail with power monitoring">
+  <img src="screenshots/port-list.webp" width="280" alt="WhatPort port list showing connected devices">
+  <img src="screenshots/detail-thunderbolt.webp" width="280" alt="Thunderbolt display detail with lane status">
+  <img src="screenshots/detail-usb-power.webp" width="280" alt="USB device detail with power monitoring">
 </p>
 
 ## Features
