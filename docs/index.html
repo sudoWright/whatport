@@ -883,16 +883,16 @@
 
           <div class="install-card">
             <div class="install-card-label">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
-              Build from source
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              Homebrew
             </div>
-<pre>git clone https://github.com/darrylmorley/whatport.git
-cd whatport
-xcodebuild -scheme WhatPort \
-  -configuration Release \
-  -destination 'platform=macOS' build</pre>
-            <a class="button primary" href="https://github.com/darrylmorley/whatport">
-              View source on GitHub
+            <p>
+              Prefer the terminal? Install with <strong style="color: #fff;">brew</strong> and get upgrades for free.
+            </p>
+<pre>brew install --cask \
+  darrylmorley/whatport/whatport</pre>
+            <a class="button primary" href="https://github.com/darrylmorley/homebrew-whatport">
+              View the tap
             </a>
           </div>
         </div>
