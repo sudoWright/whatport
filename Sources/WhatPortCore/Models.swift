@@ -47,8 +47,18 @@ public struct PortState: Identifiable, Sendable {
         if lane0.transport == .usb || lane1.transport == .usb || usb2Active {
             return .usbOnly
         }
-        // CC connected but no data lanes = power-only (charger/MagSafe)
-        if ccConnected { return .charging }
+        if ccConnected {
+            // MagSafe is charge-only: a connection is always a charger,
+            // even when the battery is full and no live wattage is shown.
+            if portType == .magSafe { return .charging }
+            // USB-C: only a negotiated power contract makes it a charger.
+            // A bare cable with nothing on the other end also trips the CC
+            // line but carries no power and no data, so treat it as idle
+            // rather than a phantom charger. Without this, an empty lead
+            // reads as a charging port and inherits the system battery
+            // state (e.g. "Battery Full").
+            return power != nil ? .charging : .idle
+        }
         return .idle
     }
 

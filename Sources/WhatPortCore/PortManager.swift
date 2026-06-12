@@ -527,21 +527,8 @@ extension PortManager {
                     ccActive: ccByPort[portID] ?? false
                 )
             }
-            // Apply charging power to USB-C sink ports (same logic as main path)
-            let batteryChargingEarly = chargingPower?.isCharging ?? false
-            for i in results.indices {
-                guard results[i].power == nil && results[i].ccConnected else { continue }
-                if batteryChargingEarly, let cp = chargingPower, cp.systemPowerIn > 0 {
-                    results[i].power = PortPower(
-                        watts: Double(cp.systemPowerIn) / 1000.0,
-                        current: cp.systemCurrentIn,
-                        voltage: cp.systemVoltageIn,
-                        configuredVoltage: cp.systemVoltageIn,
-                        configuredCurrent: cp.systemCurrentIn,
-                        vconnCurrent: 0
-                    )
-                }
-            }
+            // Attach charger power to the USB-C port with a USB-PD contract.
+            applyChargerPower(to: &results, chargerData: chargerData, chargingPower: chargingPower)
             results.append(contentsOf: buildNonUSBCPorts(nonUSBCCC, chargerData: chargerData, chargingPower: chargingPower))
             return results
         }
@@ -579,27 +566,9 @@ extension PortManager {
             ))
         }
 
-        // Apply charging power to USB-C sink ports (connected to a charger,
-        // no PowerOutDetails because power flows IN, not OUT).
-        // Only show live watts when the battery is actually charging.
-        // When battery is full, power data is left nil so the UI shows
-        // the charger as connected without a misleading wattage.
-        let batteryCharging = chargingPower?.isCharging ?? false
-
-        for i in results.indices {
-            guard results[i].power == nil && results[i].ccConnected else { continue }
-
-            if batteryCharging, let cp = chargingPower, cp.systemPowerIn > 0 {
-                results[i].power = PortPower(
-                    watts: Double(cp.systemPowerIn) / 1000.0,
-                    current: cp.systemCurrentIn,
-                    voltage: cp.systemVoltageIn,
-                    configuredVoltage: cp.systemVoltageIn,
-                    configuredCurrent: cp.systemCurrentIn,
-                    vconnCurrent: 0
-                )
-            }
-        }
+        // Attach charger power to the USB-C port that negotiated a USB-PD
+        // contract (power flows IN, so it never shows in PowerOutDetails).
+        applyChargerPower(to: &results, chargerData: chargerData, chargingPower: chargingPower)
 
         // Append non-USB-C ports (MagSafe, etc.) at the end
         results.append(contentsOf: buildNonUSBCPorts(nonUSBCCC, chargerData: chargerData, chargingPower: chargingPower))
@@ -782,6 +751,46 @@ extension PortManager {
             let a = $0.portNumber > 0 ? $0.portNumber : $0.phyID
             let b = $1.portNumber > 0 ? $1.portNumber : $1.phyID
             return a < b
+        }
+    }
+
+    // Attach charger (power-IN) data to the USB-C port that negotiated a
+    // USB-PD source contract. PowerOutDetails only covers power the Mac
+    // delivers OUT to bus-powered devices; a charger supplies power IN, so
+    // it never appears there. On Macs without PowerOutDetails (e.g. base M5)
+    // this IOPortFeaturePowerSource contract is the only per-port power
+    // signal we get. We show the negotiated contract (volts / amps) plus the
+    // live draw from PowerTelemetryData, which is near zero when the battery
+    // is full and ramps up while charging.
+    //
+    // Only the port with an actual USB-PD contract gets power. This is also
+    // what stops a bare cable (CC active, no contract) from being treated as
+    // a charger and inheriting the system battery state.
+    private func applyChargerPower(
+        to results: inout [PortState],
+        chargerData: [ChargerInput],
+        chargingPower: ChargingPowerInput?
+    ) {
+        let usbcChargers = Dictionary(
+            chargerData
+                .filter { $0.portType == "USB-C" && $0.portNumber > 0 }
+                .map { ($0.portNumber, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        guard !usbcChargers.isEmpty else { return }
+
+        for i in results.indices {
+            guard results[i].power == nil, results[i].ccConnected else { continue }
+            guard let charger = usbcChargers[results[i].id] else { continue }
+
+            results[i].power = PortPower(
+                watts: Double(chargingPower?.systemPowerIn ?? 0) / 1000.0,
+                current: chargingPower?.systemCurrentIn ?? 0,
+                voltage: chargingPower?.systemVoltageIn ?? charger.voltage,
+                configuredVoltage: charger.voltage,
+                configuredCurrent: charger.maxCurrent,
+                vconnCurrent: 0
+            )
         }
     }
 

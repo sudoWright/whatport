@@ -276,7 +276,7 @@ struct PortDetailView: View {
                     }
                 }
             } else if !powerMeteringAvailable {
-                Text("Power metering unavailable on this hardware")
+                Text("Per-port power metering not reported on this Mac")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
