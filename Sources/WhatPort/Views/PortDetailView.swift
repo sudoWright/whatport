@@ -589,6 +589,7 @@ struct USB2Bar: View {
 
     var body: some View {
         HStack(spacing: 6) {
+            Color.clear.frame(width: 6, height: 6)
             Text("USB2")
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(.secondary)
