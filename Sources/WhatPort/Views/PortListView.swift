@@ -22,6 +22,11 @@ struct PortListView: View {
             }
         }
         .frame(width: 320)
+        // macOS 26 (Tahoe) renders NSPopover with a very translucent Liquid
+        // Glass material. On a dark desktop the content bleeds through and is
+        // hard to read (issue #1). Back the content with a thick material so
+        // text stays legible while keeping a subtle frosted look.
+        .background(.thickMaterial)
     }
 
     // MARK: - Plugin panel (e.g. Pro upsell)
