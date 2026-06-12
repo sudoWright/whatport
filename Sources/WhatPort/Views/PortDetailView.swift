@@ -217,6 +217,9 @@ struct PortDetailView: View {
             + stats.enumerationFailureCount + stats.addressFailureCount
 
         return HStack(spacing: 4) {
+            Text("Lifetime:")
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
             Text("\(stats.connectCount) connections")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -257,16 +260,16 @@ struct PortDetailView: View {
 
             if let power = port.power {
                 HStack {
-                    Text(String(format: "%.1fW", power.watts))
+                    Text(String(format: "%.1f W", power.watts))
                         .font(.system(.title2, design: .rounded, weight: .semibold))
-                    Text("(\(power.current) mA @ \(power.voltage) mV)")
+                    Text("(\(formatAmps(power.current)) at \(formatVolts(power.voltage)))")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 HStack(spacing: 12) {
                     LabeledValue(
                         label: "Contract",
-                        value: "\(power.configuredVoltage)mV / \(power.configuredCurrent)mA"
+                        value: "\(formatVolts(power.configuredVoltage)) / \(formatAmps(power.configuredCurrent))"
                     )
                     if power.vconnCurrent > 0 {
                         LabeledValue(
@@ -285,6 +288,30 @@ struct PortDetailView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    // Converts millivolts to a human-readable volts string, e.g. 5234 -> "5.2 V", 5000 -> "5 V"
+    private func formatVolts(_ millivolts: Int) -> String {
+        let v = Double(millivolts) / 1000.0
+        if v == v.rounded() {
+            return "\(Int(v)) V"
+        }
+        return String(format: "%.1f V", v)
+    }
+
+    // Converts milliamps to a human-readable current string.
+    // Under 1000 mA: shows milliamps, e.g. 97 -> "97 mA", 500 -> "500 mA".
+    // 1000 mA or more: shows amps with one decimal, dropping a trailing ".0",
+    // e.g. 1500 -> "1.5 A", 2300 -> "2.3 A", 5000 -> "5 A".
+    private func formatAmps(_ milliamps: Int) -> String {
+        if milliamps < 1000 {
+            return "\(milliamps) mA"
+        }
+        let a = Double(milliamps) / 1000.0
+        if a == a.rounded() {
+            return "\(Int(a)) A"
+        }
+        return String(format: "%.1f A", a)
     }
 
     // MARK: - Power Chart
@@ -363,26 +390,23 @@ struct PortDetailView: View {
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(.secondary)
 
+            // Current negotiated link
             if let link {
                 let lanes = formatLanes(tx: link.txLanes, rx: link.rxLanes)
-                Text("\(link.generation.label) \(lanes), \(link.totalGbps) Gbps")
-                    .font(.body.weight(.medium))
+                LabeledValue(
+                    label: "Current link",
+                    value: "\(link.generation.label), \(lanes), \(link.totalGbps) Gbps"
+                )
             } else {
-                Text("No active link")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                LabeledValue(label: "Current link", value: "No active link")
             }
 
-            HStack(spacing: 12) {
-                LabeledValue(
-                    label: "Max Speed",
-                    value: "\(capability.maxGeneration.label) (\(capability.maxGeneration.perLaneGbps) Gbps/lane)"
-                )
-                LabeledValue(
-                    label: "Max Lanes",
-                    value: capability.maxLanes > 1 ? "Dual-lane" : "Single-lane"
-                )
-            }
+            // Port ceiling, regardless of what is currently connected
+            let maxLanes = capability.maxLanes > 1 ? "dual-lane" : "single-lane"
+            LabeledValue(
+                label: "Port supports",
+                value: "Up to \(capability.maxGeneration.label), \(maxLanes) (\(capability.maxGeneration.perLaneGbps) Gbps/lane)"
+            )
         }
     }
 
@@ -449,7 +473,7 @@ struct LaneBar: View {
             Text(label)
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .frame(width: 42, alignment: .trailing)
+                .frame(width: 54, alignment: .trailing)
 
             RoundedRectangle(cornerRadius: 5)
                 .fill(barFill)
@@ -568,7 +592,7 @@ struct USB2Bar: View {
             Text("USB2")
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .frame(width: 48, alignment: .trailing)
+                .frame(width: 54, alignment: .trailing)
 
             RoundedRectangle(cornerRadius: 5)
                 .fill(active ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
