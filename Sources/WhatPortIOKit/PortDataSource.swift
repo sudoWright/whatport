@@ -29,6 +29,8 @@ public struct PortSnapshot: Sendable {
     public let usb3Transport: [RawUSB3TransportState]
     public let dpTransport: [RawDPTransportState]
     public let cioTransport: [RawCIOTransportState]
+    // SMC per-port power-OUT channels (desktop power path), joined by UUID.
+    public let smcPortPower: [RawSMCPortPower]
 
     public init(
         timestamp: Date = .now,
@@ -45,7 +47,8 @@ public struct PortSnapshot: Sendable {
         powerMeteringAvailable: Bool = false,
         usb3Transport: [RawUSB3TransportState] = [],
         dpTransport: [RawDPTransportState] = [],
-        cioTransport: [RawCIOTransportState] = []
+        cioTransport: [RawCIOTransportState] = [],
+        smcPortPower: [RawSMCPortPower] = []
     ) {
         self.timestamp = timestamp
         self.hpmPorts = hpmPorts
@@ -62,6 +65,7 @@ public struct PortSnapshot: Sendable {
         self.usb3Transport = usb3Transport
         self.dpTransport = dpTransport
         self.cioTransport = cioTransport
+        self.smcPortPower = smcPortPower
     }
 }
 
@@ -70,7 +74,17 @@ public struct PortSnapshot: Sendable {
 // are added in Chunk 4.
 public enum SnapshotReader {
     public static func takeSnapshot() -> PortSnapshot {
-        PortSnapshot(
+        // Read the SMC once and reuse for both the per-port channels and the
+        // power-metering-available flag. The connection closes on deinit.
+        let smc = SMCPowerReader()
+        let smcPortPower = smc.readPortPowerChannels()
+
+        // Per-port metering is available if the battery exposes PowerOutDetails
+        // (laptops) OR the SMC exposes power channels (desktops).
+        let powerMeteringAvailable =
+            PowerReader.isPowerMeteringAvailable() || !smcPortPower.isEmpty
+
+        return PortSnapshot(
             timestamp: .now,
             hpmPorts: HPMReader.readAll(),
             phyData: PhyReader.readAll(),
@@ -82,10 +96,11 @@ public enum SnapshotReader {
             deviceData: DeviceReader.readUSBDevices(),
             displayData: DisplayReader.readDisplays(),
             portStatsData: PortStatsReader.readAll(),
-            powerMeteringAvailable: PowerReader.isPowerMeteringAvailable(),
+            powerMeteringAvailable: powerMeteringAvailable,
             usb3Transport: TransportStateReader.readUSB3(),
             dpTransport: TransportStateReader.readDisplayPort(),
-            cioTransport: TransportStateReader.readCIO()
+            cioTransport: TransportStateReader.readCIO(),
+            smcPortPower: smcPortPower
         )
     }
 }

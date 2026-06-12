@@ -298,6 +298,65 @@ import Testing
     #expect(usbc1?.uuid != magSafe?.uuid)
 }
 
+// SMC per-port power-OUT is joined to ports by UUID (the channel's DxUI = the
+// port's HPM UUID), not by the SMC D-index. The HPM UUID is uppercase with
+// dashes; the SMC form is lowercase without. The join must normalise both.
+@Test func portManagerJoinsSMCPowerByUUID() {
+    let manager = PortManager()
+
+    // Real M5 UUIDs. Port 4's HPM UUID, and its SMC DxUI form (dash-stripped,
+    // lowercase) — note the SMC channel for this port is D3, not D4.
+    let port4HPM = "17BD562D-D913-3441-0CD9-435CAC6CFA51"
+    let port4SMC = "17bd562dd91334410cd9435cac6cfa51"
+
+    let snapshot = PortManagerSnapshot(
+        hpmPorts: [
+            HPMPortInput(uuid: "6230AF2D-EE59-552E-E28A-652CCC0E7B11", portNumber: 1, portType: "USB-C"),
+            HPMPortInput(uuid: "492BAF2D-4561-2E29-5FFE-BD2ADE023D0F", portNumber: 2, portType: "USB-C"),
+            HPMPortInput(uuid: port4HPM, portNumber: 4, portType: "USB-C"),
+        ],
+        phyData: [
+            PhyInput(phyID: 0, portNumber: 1),
+            PhyInput(phyID: 1, portNumber: 2),
+            PhyInput(phyID: 2, portNumber: 4),
+        ],
+        smcPortPower: [
+            SMCPortPowerInput(present: true, volts: 5.1, amps: 2.0, uuid: port4SMC),
+        ]
+    )
+
+    manager.applySnapshot(snapshot)
+
+    let port4 = manager.ports.first { $0.id == 4 }
+    let port1 = manager.ports.first { $0.id == 1 }
+
+    // Power lands on port 4 (matched by UUID), not on port 1, and not on a
+    // phantom "port 3" from the SMC D-index.
+    #expect(port4?.power?.watts == 5.1 * 2.0)
+    #expect(port4?.power?.voltage == 5100)
+    #expect(port4?.power?.current == 2000)
+    #expect(port1?.power == nil)
+    #expect(manager.ports.contains { $0.id == 3 } == false)
+}
+
+// A channel at 0 W (nothing drawing) must not attach power.
+@Test func portManagerIgnoresZeroWattSMCChannel() {
+    let manager = PortManager()
+    let uuid = "6230AF2D-EE59-552E-E28A-652CCC0E7B11"
+    let snapshot = PortManagerSnapshot(
+        hpmPorts: [HPMPortInput(uuid: uuid, portNumber: 1, portType: "USB-C")],
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        smcPortPower: [
+            SMCPortPowerInput(present: false, volts: 0, amps: 0,
+                              uuid: uuid.replacingOccurrences(of: "-", with: "").lowercased()),
+        ]
+    )
+
+    manager.applySnapshot(snapshot)
+
+    #expect(manager.ports.first { $0.id == 1 }?.power == nil)
+}
+
 // Without HPM data (Intel / desktop / tests), ports still correlate by number
 // and simply carry no UUID. Confirms the legacy fallback path is intact.
 @Test func portManagerCorrelatesWithoutHPMData() {

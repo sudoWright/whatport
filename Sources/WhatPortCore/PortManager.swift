@@ -49,7 +49,8 @@ public final class PortManager: @unchecked Sendable {
             portStatsData: snapshot.portStatsData,
             usb3Transport: snapshot.usb3Transport,
             dpTransport: snapshot.dpTransport,
-            cioTransport: snapshot.cioTransport
+            cioTransport: snapshot.cioTransport,
+            smcPortPower: snapshot.smcPortPower
         )
 
         // Flight Recorder: record before updating published state so the
@@ -104,6 +105,7 @@ public struct PortManagerSnapshot: Sendable {
     public let usb3Transport: [USB3TransportInput]
     public let dpTransport: [DPTransportInput]
     public let cioTransport: [CIOTransportInput]
+    public let smcPortPower: [SMCPortPowerInput]
 
     public init(
         timestamp: Date = .now,
@@ -120,7 +122,8 @@ public struct PortManagerSnapshot: Sendable {
         powerMeteringAvailable: Bool = false,
         usb3Transport: [USB3TransportInput] = [],
         dpTransport: [DPTransportInput] = [],
-        cioTransport: [CIOTransportInput] = []
+        cioTransport: [CIOTransportInput] = [],
+        smcPortPower: [SMCPortPowerInput] = []
     ) {
         self.timestamp = timestamp
         self.hpmPorts = hpmPorts
@@ -137,6 +140,7 @@ public struct PortManagerSnapshot: Sendable {
         self.usb3Transport = usb3Transport
         self.dpTransport = dpTransport
         self.cioTransport = cioTransport
+        self.smcPortPower = smcPortPower
     }
 }
 
@@ -274,6 +278,25 @@ public struct HPMPortInput: Sendable {
         self.uuid = uuid
         self.portNumber = portNumber
         self.portType = portType
+    }
+}
+
+// One SMC per-port power-OUT channel. Tied to a physical port by `uuid`
+// (the channel's DxUI = the port's HPM UUID), since the SMC D-index does not
+// equal the physical port number.
+public struct SMCPortPowerInput: Sendable {
+    public let present: Bool
+    public let volts: Double
+    public let amps: Double
+    public let uuid: String   // 32-char lowercase hex (normalised)
+
+    public var watts: Double { volts * amps }
+
+    public init(present: Bool, volts: Double, amps: Double, uuid: String) {
+        self.present = present
+        self.volts = volts
+        self.amps = amps
+        self.uuid = uuid
     }
 }
 
@@ -518,7 +541,8 @@ extension PortManager {
         portStatsData: [PortStatsInput] = [],
         usb3Transport: [USB3TransportInput] = [],
         dpTransport: [DPTransportInput] = [],
-        cioTransport: [CIOTransportInput] = []
+        cioTransport: [CIOTransportInput] = [],
+        smcPortPower: [SMCPortPowerInput] = []
     ) -> [PortState] {
         // Deduplicate TB data by socket ID (multiple adapters per port, take best)
         let tbBySocket = bestTBPerSocket(tbData)
@@ -604,6 +628,13 @@ extension PortManager {
         var nonUSBC = buildNonUSBCPorts(nonUSBCCC, chargerData: chargerData, chargingPower: chargingPower)
         stampMagSafeUUIDs(&nonUSBC, hpmPorts: hpmPorts)
         results.append(contentsOf: nonUSBC)
+
+        // Desktop power-OUT: join SMC channels to ports by UUID. The SMC
+        // D-index is not the physical port number, so the channel's DxUI (=
+        // the port's HPM UUID) is the only correct join. Fills power the
+        // battery paths can't (Mac mini / Studio, or any Mac sourcing bus
+        // power), so it runs after the charger/battery power is applied.
+        applySMCPower(to: &results, smcPortPower: smcPortPower)
 
         // Build lookup dictionaries for enrichment data
         let devicesByPort = Dictionary(
@@ -824,6 +855,45 @@ extension PortManager {
                 vconnCurrent: 0
             )
         }
+    }
+
+    // Join SMC per-port power-OUT channels to ports by UUID and fill the power
+    // of any port the battery paths didn't cover. The SMC reports power the Mac
+    // delivers OUT to bus-powered devices; on desktops (no battery) it is the
+    // only per-port power source. Matched on the channel's DxUI = the port's
+    // HPM UUID, never the SMC D-index (which is not the physical port number).
+    private func applySMCPower(to results: inout [PortState], smcPortPower: [SMCPortPowerInput]) {
+        guard !smcPortPower.isEmpty else { return }
+
+        // SMC UUIDs arrive already normalised (lowercase, no dashes).
+        let byUUID = Dictionary(
+            smcPortPower.map { ($0.uuid, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+
+        for i in results.indices {
+            guard results[i].power == nil, let uuid = results[i].uuid else { continue }
+            guard let channel = byUUID[normalisedUUID(uuid)] else { continue }
+            // Only surface a reading when the Mac is actually sourcing power.
+            // A channel at 0 W means nothing is drawing; leave power nil so the
+            // UI shows "not sourcing" rather than a misleading 0.0 W.
+            guard channel.watts > 0 else { continue }
+
+            results[i].power = PortPower(
+                watts: channel.watts,
+                current: Int((channel.amps * 1000).rounded()),
+                voltage: Int((channel.volts * 1000).rounded()),
+                configuredVoltage: 0,
+                configuredCurrent: 0,
+                vconnCurrent: 0
+            )
+        }
+    }
+
+    // Normalise an HPM UUID to match the SMC DxUI form: dashes stripped,
+    // lowercase (e.g. "6230AF2D-EE59-..." -> "6230af2dee59...").
+    private func normalisedUUID(_ uuid: String) -> String {
+        uuid.replacingOccurrences(of: "-", with: "").lowercased()
     }
 
     // Stamp the stable HPM UUID onto non-USB-C ports (MagSafe). These ports

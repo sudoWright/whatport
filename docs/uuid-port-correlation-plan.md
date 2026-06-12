@@ -1,6 +1,6 @@
 # Plan: UUID-anchored port correlation
 
-Status: Phases 1 and 2 implemented (2026-06-12). Phase 3 pending.
+Status: Phases 1, 2 and 3 implemented (2026-06-12). UUID work complete.
 Author: scoping pass, 2026-06-12
 Context: requested after the charger-port-correlation bug (PR #5), where data
 landed on the wrong physical port. We want a stable per-port identity so this
@@ -127,8 +127,21 @@ canonical port.
    non-existent port 3, dropping its devices). The number is found at variable
    depth in the service plane (≈3 levels for a direct device, ≈6 behind a hub),
    so the search walks up to a generous bound and takes the first match.
-3. **Phase 3 (future, optional).** Desktop power-out: bridge the SMC `DxUI`
-   channel to the UUID for Mac mini / Studio per-port power. Out of scope now.
+3. **Phase 3 (desktop power-out) — done.** Desktops (Mac mini / Studio / Pro)
+   have no battery controller, so the per-port power-OUT figures live in the
+   SMC on channels D1..D4. Each channel's `DxUI` key equals the port's HPM
+   `UUID`, and the SMC D-index is NOT the physical port number (verified on M5:
+   D1=`@1`, D2=`@2`, D3=`@4`, D4=MagSafe`@1`), so the UUID is the only correct
+   join. `SMCPowerReader` opens an AppleSMC user client (the public ABI used by
+   powermetrics; no entitlement needed for a non-sandboxed hardened-runtime
+   build) and reads `DxUI`/`DxJV`/`DxJI`/`DxPR`. `correlate()` joins channels to
+   ports by normalised UUID and fills the power of any port the battery paths
+   didn't cover, surfacing a reading only when the Mac is actually sourcing
+   power. `powerMeteringAvailable` is now true when either the battery exposes
+   `PowerOutDetails` or the SMC exposes channels.
+
+   The SMC system DC-in figure (`VD0R`/`ID0R`/`PDTR`) is deliberately out of
+   scope: it does not use the UUID and has no UI home yet. Easy to add later.
 
 ## Blast radius
 

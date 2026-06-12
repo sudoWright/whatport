@@ -139,6 +139,14 @@ enum SnapshotAdapter {
                     dataRate: t.dataRate,
                     tunneled: t.tunneled
                 )
+            },
+            smcPortPower: snapshot.smcPortPower.map { s in
+                SMCPortPowerInput(
+                    present: s.present,
+                    volts: s.volts,
+                    amps: s.amps,
+                    uuid: s.uuid
+                )
             }
         )
     }
