@@ -8,25 +8,42 @@ struct PortListView: View {
     @State private var selectedPortID: Int?
     @State private var showingSettings = false
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         VStack(spacing: 0) {
             if let panelIndex = footerContext.showingPanelIndex {
                 pluginPanel(index: panelIndex)
+                    .transition(pushTransition(edge: .trailing))
             } else if showingSettings {
                 settingsPanel
+                    .transition(pushTransition(edge: .trailing))
             } else if let selectedID = selectedPortID,
                let port = portManager.ports.first(where: { $0.id == selectedID }) {
                 detailView(port: port)
+                    .transition(pushTransition(edge: .trailing))
             } else {
                 listView
+                    .transition(pushTransition(edge: .leading))
             }
         }
+        .clipped()
         .frame(width: 320)
         // macOS 26 (Tahoe) renders NSPopover with a very translucent Liquid
         // Glass material. On a dark desktop the content bleeds through and is
         // hard to read (issue #1). Back the content with a thick material so
         // text stays legible while keeping a subtle frosted look.
         .background(.thickMaterial)
+    }
+
+    // Push-style navigation: panels slide in from an edge with a fade, like a
+    // NavigationStack push. Falls back to a plain fade when Reduce Motion is on.
+    private func pushTransition(edge: Edge) -> AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        return .asymmetric(
+            insertion: .move(edge: edge).combined(with: .opacity),
+            removal: .move(edge: edge).combined(with: .opacity)
+        )
     }
 
     // MARK: - Plugin panel (e.g. Pro upsell)
@@ -76,7 +93,7 @@ struct PortListView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     if portManager.totalWatts > 0 {
-                        Text(String(format: "%.1fW total", portManager.totalWatts))
+                        Text(WattsFormat.string(portManager.totalWatts) + " total")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -92,7 +109,7 @@ struct PortListView: View {
             Image(systemName: "bolt.horizontal")
                 .font(.title2)
                 .foregroundStyle(.tertiary)
-            Text("Scanning ports...")
+            Text("Scanning ports\u{2026}")
                 .font(.body)
                 .foregroundStyle(.secondary)
         }
@@ -236,7 +253,7 @@ struct PortRowView: View {
                 HStack(spacing: 5) {
                     Text(titleText)
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(port.isActive ? .primary : .tertiary)
+                        .foregroundStyle(port.isActive ? .primary : .secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                     // Show port number next to device name so you know which port
@@ -248,12 +265,12 @@ struct PortRowView: View {
                 }
                 Text(summaryText)
                     .font(.subheadline)
-                    .foregroundStyle(port.isActive ? .secondary : .quaternary)
+                    .foregroundStyle(port.isActive ? .secondary : .tertiary)
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
             if let power = port.power {
-                Text(formatWatts(power.watts))
+                Text(WattsFormat.string(power.watts))
                     .font(.system(.body, design: .rounded, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(.primary)
@@ -326,7 +343,7 @@ struct PortRowView: View {
     // Protocol and speed only. Device name is in the title now,
     // so this line stays short enough to fit without truncation.
     private var summaryText: String {
-        guard port.isActive else { return "idle" }
+        guard port.isActive else { return "Idle" }
 
         if let tb = port.thunderboltLink {
             let lanes = formatLanes(tx: tb.txLanes, rx: tb.rxLanes)
@@ -358,14 +375,14 @@ struct PortRowView: View {
 
         if port.ccConnected {
             if port.primaryProtocol == .charging {
-                if fullyCharged { return "Battery Full" }
+                if fullyCharged { return "Battery full" }
                 if isCharging { return "Charging" }
-                return "Charger Connected"
+                return "Charger connected"
             }
-            return "connected"
+            return "Connected"
         }
 
-        return "active"
+        return "Active"
     }
 
     private func formatLanes(tx: Int, rx: Int) -> String {
@@ -375,10 +392,4 @@ struct PortRowView: View {
         return "\(tx)TX/\(rx)RX"
     }
 
-    private func formatWatts(_ watts: Double) -> String {
-        if watts < 1 {
-            return String(format: "%.2fW", watts)
-        }
-        return String(format: "%.1fW", watts)
-    }
 }

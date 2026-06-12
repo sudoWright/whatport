@@ -340,7 +340,7 @@ struct PortDetailView: View {
 
             if let power = port.power {
                 HStack {
-                    Text(String(format: "%.1f W", power.watts))
+                    Text(WattsFormat.string(power.watts))
                         .font(.system(.title2, design: .rounded, weight: .semibold))
                     Text("(\(formatAmps(power.current)) at \(formatVolts(power.voltage)))")
                         .font(.subheadline)
@@ -370,28 +370,30 @@ struct PortDetailView: View {
         }
     }
 
-    // Converts millivolts to a human-readable volts string, e.g. 5234 -> "5.2 V", 5000 -> "5 V"
+    // Converts millivolts to a human-readable volts string, e.g. 5234 -> "5.2 V", 5000 -> "5 V".
+    // The whole-number check runs on the FORMATTED value: 4960 mV formats to
+    // "5.0", which must render as "5 V", not "5.0 V".
     private func formatVolts(_ millivolts: Int) -> String {
-        let v = Double(millivolts) / 1000.0
-        if v == v.rounded() {
-            return "\(Int(v)) V"
+        let formatted = String(format: "%.1f", Double(millivolts) / 1000.0)
+        if formatted.hasSuffix(".0") {
+            return "\(formatted.dropLast(2)) V"
         }
-        return String(format: "%.1f V", v)
+        return "\(formatted) V"
     }
 
     // Converts milliamps to a human-readable current string.
     // Under 1000 mA: shows milliamps, e.g. 97 -> "97 mA", 500 -> "500 mA".
-    // 1000 mA or more: shows amps with one decimal, dropping a trailing ".0",
-    // e.g. 1500 -> "1.5 A", 2300 -> "2.3 A", 5000 -> "5 A".
+    // 1000 mA or more: shows amps with one decimal, dropping a trailing ".0"
+    // from the formatted value, e.g. 1500 -> "1.5 A", 2960 -> "3 A".
     private func formatAmps(_ milliamps: Int) -> String {
         if milliamps < 1000 {
             return "\(milliamps) mA"
         }
-        let a = Double(milliamps) / 1000.0
-        if a == a.rounded() {
-            return "\(Int(a)) A"
+        let formatted = String(format: "%.1f", Double(milliamps) / 1000.0)
+        if formatted.hasSuffix(".0") {
+            return "\(formatted.dropLast(2)) A"
         }
-        return String(format: "%.1f A", a)
+        return "\(formatted) A"
     }
 
     // MARK: - Power Chart
