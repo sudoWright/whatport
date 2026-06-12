@@ -29,8 +29,12 @@ public enum PortStatsReader {
         // SuperSpeed ports have the detailed stats.
         // The class name varies by chip, so match on the property instead.
         withMatchingServices(className: "IOUSBHostDevice") { service in
-            // Read UsbCPortNumber from the parent (the USB port service)
-            let portNumber = ioInt(ioParentProperty(service, key: "UsbCPortNumber"))
+            // Use the device-tree "port-number" (the true physical port,
+            // matching the HPM @N) rather than the XHCI "UsbCPortNumber",
+            // which numbers ports sequentially and disagrees on Macs that
+            // skip a port. Keeps stats aligned with the rest of the roster.
+            let portNumber = ioFirstAncestorDataInt(service, key: "port-number", maxLevels: 10)
+                ?? ioInt(ioParentProperty(service, key: "UsbCPortNumber"))
             guard portNumber > 0, !seen.contains(portNumber) else { return }
             seen.insert(portNumber)
 

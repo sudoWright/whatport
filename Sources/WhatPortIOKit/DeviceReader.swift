@@ -42,11 +42,16 @@ public enum DeviceReader {
             guard locationID > 0, !seen.contains(locationID) else { return }
             seen.insert(locationID)
 
-            // UsbCPortNumber on the parent USB port gives the physical
-            // port directly. Falls back to walking 3 levels up to the
-            // usb-drd node's port-number if UsbCPortNumber is absent.
-            let portNumber = ioInt(ioParentProperty(service, key: "UsbCPortNumber"))
-                .nonZero ?? ioDataInt(ioAncestorProperty(service, key: "port-number", levels: 3)) ?? 0
+            // Prefer the device-tree "port-number" from the usb-drd node: it
+            // is the true physical port (matching the HPM @N and the rest of
+            // the port roster). The XHCI "UsbCPortNumber" numbers ports
+            // sequentially (1/2/3) and disagrees with the physical numbering
+            // (1/2/4) on Macs that skip a port, so a device on physical port 4
+            // would otherwise be tied to a non-existent port 3 and dropped.
+            // Fall back to UsbCPortNumber only when port-number isn't reachable.
+            let portNumber = ioFirstAncestorDataInt(service, key: "port-number", maxLevels: 10)
+                ?? ioInt(ioParentProperty(service, key: "UsbCPortNumber")).nonZero
+                ?? 0
 
             results.append(RawDeviceInfo(
                 portNumber: portNumber,

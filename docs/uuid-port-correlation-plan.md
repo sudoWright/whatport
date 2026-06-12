@@ -1,6 +1,6 @@
 # Plan: UUID-anchored port correlation
 
-Status: Phase 1 implemented (2026-06-12). Phases 2 and 3 pending.
+Status: Phases 1 and 2 implemented (2026-06-12). Phase 3 pending.
 Author: scoping pass, 2026-06-12
 Context: requested after the charger-port-correlation bug (PR #5), where data
 landed on the wrong physical port. We want a stable per-port identity so this
@@ -117,9 +117,16 @@ canonical port.
 1. **Phase 1 (the spine).** HPM reader + canonical UUID-keyed port list + map
    existing `@N`/socket-ID/PHY joins onto it. Removes the `portType`
    workaround by construction. Keep full port-number fallback for non-HPM Macs.
-2. **Phase 2 (USB device bridge).** Resolve `IOUSBHostDevice` to the canonical
-   port by HPM-UUID parent walk (or `locationID`), not `UsbCPortNumber`. Fixes
-   the XHCI/HPM numbering mismatch.
+2. **Phase 2 (USB device bridge) — done.** The HPM UUID is NOT reachable by
+   walking up from a USB device: devices hang off the XHCI/Thunderbolt PCIe
+   branch, while the HPM controller is on a separate branch. So the bridge is
+   the device-tree `port-number` on the `usb-drd<N>` node, which equals the
+   HPM `@N` (verified on M5: `usb-drd0/1/3` → `port-number` 1/2/4, exactly the
+   HPM ports). `DeviceReader` / `PortStatsReader` now prefer this over the XHCI
+   `UsbCPortNumber` (which numbers 1/2/3 and mis-tied a port-4 dock to a
+   non-existent port 3, dropping its devices). The number is found at variable
+   depth in the service plane (≈3 levels for a direct device, ≈6 behind a hub),
+   so the search walks up to a generous bound and takes the first match.
 3. **Phase 3 (future, optional).** Desktop power-out: bridge the SMC `DxUI`
    channel to the UUID for Mac mini / Studio per-port power. Out of scope now.
 
