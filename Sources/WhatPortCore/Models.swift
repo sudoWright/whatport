@@ -31,6 +31,10 @@ public struct PortState: Identifiable, Sendable {
     // liveTransports when available.
     public var dpLinkRate: String = ""
 
+    // Health signals from the HPM port-controller node.
+    // Nil on machines without an HPM node or when health data is unavailable.
+    public var health: PortHealth?
+
     // Live transport state from IOPortTransportState* services.
     // One entry per active transport on this port (USB3, DP, CIO).
     public var liveTransports: [LiveTransport] = []
@@ -100,6 +104,38 @@ public struct PortState: Identifiable, Sendable {
         self.cable = cable
         self.portStats = portStats
         self.thunderboltCapability = thunderboltCapability
+    }
+}
+
+// MARK: - Port Health
+
+// Health signals from the HPM port-controller node.
+// Present only when the HPM layer is available (Apple Silicon, M1+).
+public struct PortHealth: Sendable, Equatable {
+    public var overcurrentCount: Int
+    public var plugEventCount: Int
+    public var connectionCount: Int
+    public var authorizationStatus: String
+    public var ldcmStatus: String
+
+    // A port is healthy when no overcurrents have been recorded and the LDCM
+    // measurement status is either absent or explicitly reports no error.
+    public var isHealthy: Bool {
+        overcurrentCount == 0 && (ldcmStatus.isEmpty || ldcmStatus == "No Error")
+    }
+
+    public init(
+        overcurrentCount: Int = 0,
+        plugEventCount: Int = 0,
+        connectionCount: Int = 0,
+        authorizationStatus: String = "",
+        ldcmStatus: String = ""
+    ) {
+        self.overcurrentCount = overcurrentCount
+        self.plugEventCount = plugEventCount
+        self.connectionCount = connectionCount
+        self.authorizationStatus = authorizationStatus
+        self.ldcmStatus = ldcmStatus
     }
 }
 

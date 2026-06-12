@@ -209,6 +209,11 @@ struct PortDetailView: View {
                 statsLine(stats)
                     .padding(.top, 2)
             }
+
+            if let health = port.health {
+                healthRow(health)
+                    .padding(.top, 2)
+            }
         }
     }
 
@@ -248,6 +253,34 @@ struct PortDetailView: View {
             parts.append("\(stats.addressFailureCount) address")
         }
         return parts.joined(separator: ", ") + " error\(total > 1 ? "s" : "")"
+    }
+
+    private func healthRow(_ health: PortHealth) -> some View {
+        HStack(spacing: 4) {
+            Text("Port health:")
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
+            if health.isHealthy {
+                Text("OK")
+                    .font(.footnote)
+                    .foregroundStyle(.green)
+            } else {
+                Text(unhealthySummary(health))
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private func unhealthySummary(_ health: PortHealth) -> String {
+        var parts: [String] = []
+        if health.overcurrentCount > 0 {
+            parts.append("Overcurrent: \(health.overcurrentCount) event\(health.overcurrentCount > 1 ? "s" : "")")
+        }
+        if !health.ldcmStatus.isEmpty && health.ldcmStatus != "No Error" {
+            parts.append(health.ldcmStatus)
+        }
+        return parts.isEmpty ? "Warning" : parts.joined(separator: ", ")
     }
 
     // MARK: - Power Section

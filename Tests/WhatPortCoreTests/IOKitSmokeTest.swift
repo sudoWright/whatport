@@ -39,6 +39,17 @@ import Testing
     #expect(Set(uuids).count == uuids.count, "HPM port UUIDs should be unique")
 }
 
+@Test func hpmReaderReturnsNonNegativeHealthCounters() {
+    let ports = HPMReader.readAll()
+    #expect(!ports.isEmpty, "Expected at least one HPM port on Apple Silicon")
+
+    for port in ports {
+        #expect(port.overcurrentCount >= 0, "Overcurrent count must be non-negative")
+        #expect(port.plugEventCount >= 0, "Plug event count must be non-negative")
+        #expect(port.connectionCount >= 0, "Connection count must be non-negative")
+    }
+}
+
 @Test func snapshotReaderProducesCompleteSnapshot() {
     let snapshot = SnapshotReader.takeSnapshot()
     #expect(!snapshot.phyData.isEmpty)

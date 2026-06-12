@@ -264,20 +264,39 @@ public struct PowerInput: Sendable {
 }
 
 // One physical port from the HPM controller layer. The authoritative port
-// roster, carrying the stable UUID identity.
+// roster, carrying the stable UUID identity and health counters.
 public struct HPMPortInput: Sendable {
     public let uuid: String
     public let portNumber: Int
     public let portType: String   // "USB-C", "MagSafe 3", etc.
+    public let overcurrentCount: Int
+    public let plugEventCount: Int
+    public let connectionCount: Int
+    public let authorizationStatus: String
+    public let ldcmStatus: String
 
     public var isMagSafe: Bool {
         portType.lowercased().contains("magsafe")
     }
 
-    public init(uuid: String, portNumber: Int, portType: String) {
+    public init(
+        uuid: String,
+        portNumber: Int,
+        portType: String,
+        overcurrentCount: Int = 0,
+        plugEventCount: Int = 0,
+        connectionCount: Int = 0,
+        authorizationStatus: String = "",
+        ldcmStatus: String = ""
+    ) {
         self.uuid = uuid
         self.portNumber = portNumber
         self.portType = portType
+        self.overcurrentCount = overcurrentCount
+        self.plugEventCount = plugEventCount
+        self.connectionCount = connectionCount
+        self.authorizationStatus = authorizationStatus
+        self.ldcmStatus = ldcmStatus
     }
 }
 
@@ -595,6 +614,13 @@ extension PortManager {
                     ccActive: ccByPort[hpm.portNumber] ?? false
                 )
                 state.uuid = hpm.uuid
+                state.health = PortHealth(
+                    overcurrentCount: hpm.overcurrentCount,
+                    plugEventCount: hpm.plugEventCount,
+                    connectionCount: hpm.connectionCount,
+                    authorizationStatus: hpm.authorizationStatus,
+                    ldcmStatus: hpm.ldcmStatus
+                )
                 return state
             }
         } else if !socketIDs.isEmpty {
@@ -624,9 +650,9 @@ extension PortManager {
         // contract (power flows IN, so it never shows in PowerOutDetails).
         applyChargerPower(to: &results, chargerData: chargerData, chargingPower: chargingPower)
 
-        // Append non-USB-C ports (MagSafe, etc.), stamping their HPM UUID.
+        // Append non-USB-C ports (MagSafe, etc.), stamping their HPM UUID and health.
         var nonUSBC = buildNonUSBCPorts(nonUSBCCC, chargerData: chargerData, chargingPower: chargingPower)
-        stampMagSafeUUIDs(&nonUSBC, hpmPorts: hpmPorts)
+        stampMagSafeHPMData(&nonUSBC, hpmPorts: hpmPorts)
         results.append(contentsOf: nonUSBC)
 
         // Desktop power-OUT: join SMC channels to ports by UUID. The SMC
@@ -896,19 +922,25 @@ extension PortManager {
         uuid.replacingOccurrences(of: "-", with: "").lowercased()
     }
 
-    // Stamp the stable HPM UUID onto non-USB-C ports (MagSafe). These ports
-    // are built from CC data and keyed by id = 100 + portNumber, so we map
-    // back to the physical number to look up the HPM entry. No-op without HPM.
-    private func stampMagSafeUUIDs(_ ports: inout [PortState], hpmPorts: [HPMPortInput]) {
+    // Stamp the stable HPM UUID and health data onto non-USB-C ports (MagSafe).
+    // These ports are built from CC data and keyed by id = 100 + portNumber, so
+    // we map back to the physical number to look up the HPM entry. No-op without HPM.
+    private func stampMagSafeHPMData(_ ports: inout [PortState], hpmPorts: [HPMPortInput]) {
         guard !hpmPorts.isEmpty else { return }
         let magByNumber = Dictionary(
-            hpmPorts.filter { $0.isMagSafe }.map { ($0.portNumber, $0.uuid) },
+            hpmPorts.filter { $0.isMagSafe }.map { ($0.portNumber, $0) },
             uniquingKeysWith: { first, _ in first }
         )
         for i in ports.indices where ports[i].portType == .magSafe {
-            if let uuid = magByNumber[ports[i].id - 100] {
-                ports[i].uuid = uuid
-            }
+            guard let hpm = magByNumber[ports[i].id - 100] else { continue }
+            ports[i].uuid = hpm.uuid
+            ports[i].health = PortHealth(
+                overcurrentCount: hpm.overcurrentCount,
+                plugEventCount: hpm.plugEventCount,
+                connectionCount: hpm.connectionCount,
+                authorizationStatus: hpm.authorizationStatus,
+                ldcmStatus: hpm.ldcmStatus
+            )
         }
     }
 

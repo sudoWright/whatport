@@ -12,7 +12,12 @@ enum SnapshotAdapter {
                 HPMPortInput(
                     uuid: hpm.uuid,
                     portNumber: hpm.portNumber,
-                    portType: hpm.portType
+                    portType: hpm.portType,
+                    overcurrentCount: hpm.overcurrentCount,
+                    plugEventCount: hpm.plugEventCount,
+                    connectionCount: hpm.connectionCount,
+                    authorizationStatus: hpm.authorizationStatus,
+                    ldcmStatus: hpm.ldcmStatus
                 )
             },
             phyData: snapshot.phyData.map { phy in

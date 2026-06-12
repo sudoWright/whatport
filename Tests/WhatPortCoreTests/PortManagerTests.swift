@@ -357,6 +357,65 @@ import Testing
     #expect(manager.ports.first { $0.id == 1 }?.power == nil)
 }
 
+// HPM health data flows through to PortState.health; a port with no
+// overcurrent and no LDCM error is healthy (usage counts aside).
+@Test func portManagerStampsHealthyPortFromHPMData() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        hpmPorts: [
+            HPMPortInput(
+                uuid: "6230AF2D-EE59-552E-E28A-652CCC0E7B11",
+                portNumber: 1,
+                portType: "USB-C",
+                overcurrentCount: 0,
+                plugEventCount: 12,
+                connectionCount: 34,
+                authorizationStatus: "Authorized",
+                ldcmStatus: "No Error"
+            )
+        ],
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        tbData: [ThunderboltInput(socketID: 1)]
+    )
+
+    manager.applySnapshot(snapshot)
+
+    let port = manager.ports.first { $0.id == 1 }
+    #expect(port?.health != nil)
+    #expect(port?.health?.overcurrentCount == 0)
+    #expect(port?.health?.isHealthy == true)
+}
+
+// A port with overcurrent events is unhealthy.
+@Test func portManagerStampsUnhealthyPortFromHPMData() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        hpmPorts: [
+            HPMPortInput(
+                uuid: "6230AF2D-EE59-552E-E28A-652CCC0E7B11",
+                portNumber: 1,
+                portType: "USB-C",
+                overcurrentCount: 2,
+                plugEventCount: 5,
+                connectionCount: 10,
+                authorizationStatus: "Authorized",
+                ldcmStatus: "No Error"
+            )
+        ],
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        tbData: [ThunderboltInput(socketID: 1)]
+    )
+
+    manager.applySnapshot(snapshot)
+
+    let port = manager.ports.first { $0.id == 1 }
+    #expect(port?.health != nil)
+    #expect(port?.health?.overcurrentCount == 2)
+    #expect(port?.health?.isHealthy == false)
+}
+
 // Without HPM data (Intel / desktop / tests), ports still correlate by number
 // and simply carry no UUID. Confirms the legacy fallback path is intact.
 @Test func portManagerCorrelatesWithoutHPMData() {

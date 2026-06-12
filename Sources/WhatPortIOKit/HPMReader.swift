@@ -21,6 +21,11 @@ public struct RawHPMPort: Sendable {
     public let portNumber: Int   // the "@N" suffix
     public let portType: String  // "USB-C", "MagSafe 3", etc.
     public let serviceName: String
+    public let overcurrentCount: Int
+    public let plugEventCount: Int
+    public let connectionCount: Int
+    public let authorizationStatus: String
+    public let ldcmStatus: String
 
     public var isMagSafe: Bool {
         portType.lowercased().contains("magsafe")
@@ -63,11 +68,22 @@ public enum HPMReader {
                 guard !seen.contains(key) else { return }
                 seen.insert(key)
 
+                let overcurrentCount = ioInt(ioProperty(service, key: "Overcurrent Count"))
+                let plugEventCount = ioInt(ioProperty(service, key: "Plug Event Count"))
+                let connectionCount = ioInt(ioProperty(service, key: "ConnectionCount"))
+                let authorizationStatus = ioString(ioProperty(service, key: "UserAuthorizationStatusDescription"))
+                let ldcmStatus = ioString(ioProperty(service, key: "LDCM_MeasurementStatusDescription"))
+
                 results.append(RawHPMPort(
                     uuid: uuid,
                     portNumber: portNumber,
                     portType: portType,
-                    serviceName: name
+                    serviceName: name,
+                    overcurrentCount: overcurrentCount,
+                    plugEventCount: plugEventCount,
+                    connectionCount: connectionCount,
+                    authorizationStatus: authorizationStatus,
+                    ldcmStatus: ldcmStatus
                 ))
             }
         }
