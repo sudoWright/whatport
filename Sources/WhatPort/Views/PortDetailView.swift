@@ -256,31 +256,36 @@ struct PortDetailView: View {
     }
 
     private func healthRow(_ health: PortHealth) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             Text("Port health:")
                 .font(.footnote)
                 .foregroundStyle(.tertiary)
-            if health.isHealthy {
-                Text("OK")
-                    .font(.footnote)
-                    .foregroundStyle(.green)
-            } else {
-                Text(unhealthySummary(health))
-                    .font(.footnote)
-                    .foregroundStyle(.orange)
-            }
+            healthBadge(health)
         }
     }
 
-    private func unhealthySummary(_ health: PortHealth) -> String {
-        var parts: [String] = []
-        if health.overcurrentCount > 0 {
-            parts.append("Overcurrent: \(health.overcurrentCount) event\(health.overcurrentCount > 1 ? "s" : "")")
-        }
-        if !health.ldcmStatus.isEmpty && health.ldcmStatus != "No Error" {
-            parts.append(health.ldcmStatus)
-        }
-        return parts.isEmpty ? "Warning" : parts.joined(separator: ", ")
+    @ViewBuilder
+    private func healthBadge(_ health: PortHealth) -> some View {
+        let (fill, textColor, label): (Color, Color, String) = {
+            switch health.severity {
+            case .ok:
+                return (.green, .green, "OK")
+            case .warning:
+                let text = health.ldcmStatus.isEmpty ? "Warning" : health.ldcmStatus
+                return (.orange, .orange, text)
+            case .serious:
+                let n = health.overcurrentCount
+                let text = "Overcurrent: \(n) event\(n > 1 ? "s" : "")"
+                return (.red, .red, text)
+            }
+        }()
+
+        Text(label)
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(textColor)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(fill.opacity(0.12), in: Capsule())
     }
 
     // MARK: - Power Section

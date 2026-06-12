@@ -109,6 +109,10 @@ public struct PortState: Identifiable, Sendable {
 
 // MARK: - Port Health
 
+public enum HealthSeverity: Sendable, Equatable {
+    case ok, warning, serious
+}
+
 // Health signals from the HPM port-controller node.
 // Present only when the HPM layer is available (Apple Silicon, M1+).
 public struct PortHealth: Sendable, Equatable {
@@ -118,11 +122,16 @@ public struct PortHealth: Sendable, Equatable {
     public var authorizationStatus: String
     public var ldcmStatus: String
 
-    // A port is healthy when no overcurrents have been recorded and the LDCM
-    // measurement status is either absent or explicitly reports no error.
-    public var isHealthy: Bool {
-        overcurrentCount == 0 && (ldcmStatus.isEmpty || ldcmStatus == "No Error")
+    // .serious when overcurrents have been recorded.
+    // .warning when LDCM reports an error string.
+    // .ok otherwise.
+    public var severity: HealthSeverity {
+        if overcurrentCount > 0 { return .serious }
+        if !ldcmStatus.isEmpty && ldcmStatus != "No Error" { return .warning }
+        return .ok
     }
+
+    public var isHealthy: Bool { severity == .ok }
 
     public init(
         overcurrentCount: Int = 0,

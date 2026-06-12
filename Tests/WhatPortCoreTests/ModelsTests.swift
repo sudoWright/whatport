@@ -73,6 +73,36 @@ import Testing
     #expect(port.isActive)
 }
 
+@Test func portHealthSeverityOk() {
+    let health = PortHealth(overcurrentCount: 0, ldcmStatus: "No Error")
+    #expect(health.severity == .ok)
+    #expect(health.isHealthy == true)
+}
+
+@Test func portHealthSeverityOkEmptyLdcm() {
+    let health = PortHealth(overcurrentCount: 0, ldcmStatus: "")
+    #expect(health.severity == .ok)
+    #expect(health.isHealthy == true)
+}
+
+@Test func portHealthSeverityWarning() {
+    let health = PortHealth(overcurrentCount: 0, ldcmStatus: "Some Error")
+    #expect(health.severity == .warning)
+    #expect(health.isHealthy == false)
+}
+
+@Test func portHealthSeveritySeriousOvercurrent() {
+    let health = PortHealth(overcurrentCount: 1, ldcmStatus: "No Error")
+    #expect(health.severity == .serious)
+    #expect(health.isHealthy == false)
+}
+
+@Test func portHealthSeverityOvercurrentDominates() {
+    // Overcurrent takes priority over a warning-level LDCM status
+    let health = PortHealth(overcurrentCount: 2, ldcmStatus: "Some Error")
+    #expect(health.severity == .serious)
+}
+
 @Test func portStatePrimaryProtocol() {
     let idle = PortState(id: 1)
     #expect(idle.primaryProtocol == .idle)
