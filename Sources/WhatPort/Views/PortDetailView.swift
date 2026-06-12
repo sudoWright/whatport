@@ -444,6 +444,11 @@ struct LaneBar: View {
                 .frame(height: 22)
                 .overlay {
                     HStack(spacing: 4) {
+                        if isRestricted {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(barTextColor)
+                        }
                         Text(barLabel)
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(barTextColor)
@@ -467,6 +472,8 @@ struct LaneBar: View {
 
     // Muted tinted fill instead of solid color
     private var barFill: Color {
+        // A blocked USB lane is a warning state — amber fill, not healthy green.
+        if isRestricted { return .orange.opacity(isLanePowered ? 0.12 : 0.06) }
         let opacity = isLanePowered ? 0.12 : 0.06
         switch state.transport {
         case .thunderbolt: return .blue.opacity(opacity)
@@ -478,8 +485,8 @@ struct LaneBar: View {
 
     // Colored text on muted background instead of white on solid
     private var barTextColor: Color {
-        // A blocked link is a warning state, regardless of protocol.
-        if isRestricted { return .red }
+        // A blocked lane is a warning state — amber text matches the amber fill.
+        if isRestricted { return .orange }
         switch state.transport {
         case .thunderbolt: return .blue
         case .displayPort: return .orange
@@ -510,13 +517,10 @@ struct LaneBar: View {
             }
             return "DisplayPort"
         case .usb:
-            // A restricted link reports a speed but carries no data.
-            // Show that it is blocked rather than implying a healthy link.
+            // A restricted link has no active data flow; IOKit reports "None"
+            // as the data rate. Skip the rate entirely — just label it blocked.
             if isRestricted {
-                if let lt = liveTransport, !lt.dataRate.isEmpty {
-                    return "USB3 \u{00B7} \(lt.dataRate) blocked"
-                }
-                return "USB3 \u{00B7} blocked"
+                return "USB3 \u{00B7} Blocked"
             }
             // Prefer live USB3 transport data, fall back to device speed
             if let lt = liveTransport, !lt.dataRate.isEmpty {
