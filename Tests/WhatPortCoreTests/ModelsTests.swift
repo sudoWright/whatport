@@ -49,6 +49,16 @@ import Testing
     #expect(cap.maxGeneration == .tb5)
 }
 
+// Regression: supportedLinkWidth is a bitmask. TB5 reports 3 (0x1|0x2) which
+// previously fell through to the default and wrongly returned 1 (single-lane).
+@Test func tbCapabilityMaxLanesBitmask() {
+    let dualCap = ThunderboltCapability(supportedLinkSpeed: 14, supportedLinkWidth: 3, thunderboltVersion: 64)
+    #expect(dualCap.maxLanes == 2)
+
+    let singleCap = ThunderboltCapability(supportedLinkSpeed: 14, supportedLinkWidth: 1, thunderboltVersion: 64)
+    #expect(singleCap.maxLanes == 1)
+}
+
 @Test func tbGenerationPerLaneSpeed() {
     #expect(TBGeneration.tb3.perLaneGbps == 10)
     #expect(TBGeneration.tb4.perLaneGbps == 20)

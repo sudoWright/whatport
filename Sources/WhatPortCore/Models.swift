@@ -386,12 +386,12 @@ public struct ThunderboltCapability: Sendable, Equatable {
             ?? .tb4
     }
 
+    // "Supported Link Width" is a bitmask: BIT(0)=0x1 single-lane, BIT(1)=0x2
+    // dual-lane. A TB5 port reports 3 (0x1|0x2), meaning it supports both.
+    // Pick the highest width bit that is set, same approach as init(supportedSpeedMask:).
     public var maxLanes: Int {
-        switch supportedLinkWidth {
-        case 0x1: return 1
-        case 0x2: return 2
-        default: return 1
-        }
+        if supportedLinkWidth & 0x2 != 0 { return 2 }
+        return 1
     }
 
     public init(
