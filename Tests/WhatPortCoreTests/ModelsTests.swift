@@ -13,6 +13,42 @@ import Testing
     #expect(TBGeneration(speedCode: 99) == .tb4) // unknown defaults to TB4
 }
 
+@Test func tbGenerationFromThunderboltVersion() {
+    #expect(TBGeneration(thunderboltVersion: 16) == .tb3)
+    #expect(TBGeneration(thunderboltVersion: 32) == .tb4)
+    #expect(TBGeneration(thunderboltVersion: 64) == .tb5)
+    #expect(TBGeneration(thunderboltVersion: 0) == nil) // unknown -> nil
+}
+
+@Test func tbGenerationFromSupportedSpeedMask() {
+    #expect(TBGeneration(supportedSpeedMask: 0x8) == .tb3)        // TB3 only
+    #expect(TBGeneration(supportedSpeedMask: 12) == .tb4)         // 0x4|0x8
+    #expect(TBGeneration(supportedSpeedMask: 14) == .tb5)         // 0x2|0x4|0x8
+    #expect(TBGeneration(supportedSpeedMask: 0) == nil)           // nothing set
+}
+
+// Regression: a TB5 host (Thunderbolt Version 64) whose supported-speed
+// bitmask reads 12 must report TB5 capability, not TB4. Previously the
+// bitmask was fed into the per-lane speed-code decoder and fell through
+// to the TB4 default.
+@Test func tbCapabilityReportsTB5OnTB5Host() {
+    let cap = ThunderboltCapability(
+        supportedLinkSpeed: 12,
+        supportedLinkWidth: 0x2,
+        thunderboltVersion: 64
+    )
+    #expect(cap.maxGeneration == .tb5)
+}
+
+@Test func tbCapabilityFallsBackToMaskWhenVersionUnknown() {
+    let cap = ThunderboltCapability(
+        supportedLinkSpeed: 14,
+        supportedLinkWidth: 0x2,
+        thunderboltVersion: 0
+    )
+    #expect(cap.maxGeneration == .tb5)
+}
+
 @Test func tbGenerationPerLaneSpeed() {
     #expect(TBGeneration.tb3.perLaneGbps == 10)
     #expect(TBGeneration.tb4.perLaneGbps == 20)

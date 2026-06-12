@@ -152,6 +152,10 @@ public enum TBGeneration: Sendable, Equatable {
     // 0x2 = Gen 4 / TB5 (40 Gbps/lane)
     // 0x4 = Gen 3 / TB4 (20 Gbps/lane)
     // 0x8 = Gen 2 / TB3 (10 Gbps/lane)
+    //
+    // This is for "Current Link Speed" only, which is always a single code.
+    // For "Supported Link Speed" (a bitmask) use init(supportedSpeedMask:),
+    // and for static port capability prefer init(thunderboltVersion:).
     public init(speedCode: Int) {
         switch speedCode {
         case 0x2: self = .tb5
@@ -159,6 +163,33 @@ public enum TBGeneration: Sendable, Equatable {
         case 0x8: self = .tb3
         default: self = .tb4
         }
+    }
+
+    // Maps the IOKit "Thunderbolt Version" controller constant to generation.
+    // From thunderbolt-fabric.md research:
+    // 64 = Type7 (TB5), 32 = Type5 (TB4), 16 = Intel Type3/Type4 (TB3)
+    // This is the most stable capability signal: it is present even when the
+    // port is idle, unlike the negotiated link/supported-speed fields.
+    // Returns nil for unknown values so callers can fall back.
+    public init?(thunderboltVersion: Int) {
+        switch thunderboltVersion {
+        case 64: self = .tb5
+        case 32: self = .tb4
+        case 16: self = .tb3
+        default: return nil
+        }
+    }
+
+    // Maps the IOKit "Supported Link Speed" bitmask to the highest generation.
+    // Unlike "Current Link Speed", this field ORs together every speed the
+    // controller supports (e.g. 0x4 | 0x8 = 12 for a TB4 controller,
+    // 0x2 | 0x4 | 0x8 = 14 for TB5). We pick the fastest bit that is set.
+    // Returns nil when no known bit is set so callers can fall back.
+    public init?(supportedSpeedMask: Int) {
+        if supportedSpeedMask & 0x2 != 0 { self = .tb5 }
+        else if supportedSpeedMask & 0x4 != 0 { self = .tb4 }
+        else if supportedSpeedMask & 0x8 != 0 { self = .tb3 }
+        else { return nil }
     }
 
     public var label: String {
@@ -324,12 +355,17 @@ public struct PortStatistics: Sendable, Equatable {
 // Port-level TB capability (always present for TB-capable ports,
 // even when no device is connected and no link is active).
 public struct ThunderboltCapability: Sendable, Equatable {
-    public var supportedLinkSpeed: Int   // max speed code (12 = TB5, etc.)
+    public var supportedLinkSpeed: Int   // speed bitmask (12 = TB4, 14 = TB5)
     public var supportedLinkWidth: Int   // max width code (2 = dual-lane)
     public var thunderboltVersion: Int
 
+    // Prefer the static "Thunderbolt Version" constant: it reports the
+    // controller's true ceiling even when the port is idle. Fall back to the
+    // supported-speed bitmask, then to TB4 as a last resort.
     public var maxGeneration: TBGeneration {
-        TBGeneration(speedCode: supportedLinkSpeed)
+        TBGeneration(thunderboltVersion: thunderboltVersion)
+            ?? TBGeneration(supportedSpeedMask: supportedLinkSpeed)
+            ?? .tb4
     }
 
     public var maxLanes: Int {
@@ -362,6 +398,11 @@ public struct LiveTransport: Sendable, Equatable {
     public var laneCount: Int            // DP only; 0 otherwise
     public var maxLaneCount: Int         // DP only
     public var tunneled: Bool
+    // macOS Transport Restriction Mode has blocked data on this link.
+    // The link still reports a signaling speed, but no data flows until the
+    // device is authorised. Surface this so a blocked port is not mistaken
+    // for a healthy one. USB only; always false for DP/Thunderbolt.
+    public var restricted: Bool
 
     public init(
         kind: LaneTransport,
@@ -369,7 +410,8 @@ public struct LiveTransport: Sendable, Equatable {
         generation: String = "",
         laneCount: Int = 0,
         maxLaneCount: Int = 0,
-        tunneled: Bool = false
+        tunneled: Bool = false,
+        restricted: Bool = false
     ) {
         self.kind = kind
         self.dataRate = dataRate
@@ -377,6 +419,7 @@ public struct LiveTransport: Sendable, Equatable {
         self.laneCount = laneCount
         self.maxLaneCount = maxLaneCount
         self.tunneled = tunneled
+        self.restricted = restricted
     }
 }
 

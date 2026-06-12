@@ -21,6 +21,11 @@ public struct RawUSB3TransportState: Sendable {
     public let generation: String        // "Gen 2"
     public let generationFamily: String  // "USB 3.x"
     public let tunneled: Bool
+    // True when macOS Transport Restriction Mode has blocked data on this
+    // link. The link can report a real signaling speed while Active is false
+    // and data is shut off (e.g. an unauthorised device awaiting approval).
+    // Without this flag a restricted port looks like a healthy idle port.
+    public let transportRestricted: Bool
 }
 
 public struct RawDPTransportState: Sendable {
@@ -56,7 +61,8 @@ public enum TransportStateReader {
                 dataRate: ioString(props["DataRateDescription"]),
                 generation: ioString(props["SuperSpeedSignalingDescription"]),
                 generationFamily: ioString(props["GenerationDescription"]),
-                tunneled: ioBool(props["Tunneled"])
+                tunneled: ioBool(props["Tunneled"]),
+                transportRestricted: ioBool(props["TRM_TransportRestricted"])
             )
             results.append(data)
         }

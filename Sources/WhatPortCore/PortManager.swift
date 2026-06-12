@@ -386,6 +386,7 @@ public struct USB3TransportInput: Sendable {
     public let generation: String        // "Gen 2"
     public let generationFamily: String  // "USB 3.x"
     public let tunneled: Bool
+    public let transportRestricted: Bool // macOS TRM has blocked data
 
     public init(
         portNumber: Int,
@@ -393,7 +394,8 @@ public struct USB3TransportInput: Sendable {
         dataRate: String = "",
         generation: String = "",
         generationFamily: String = "",
-        tunneled: Bool = false
+        tunneled: Bool = false,
+        transportRestricted: Bool = false
     ) {
         self.portNumber = portNumber
         self.active = active
@@ -401,6 +403,7 @@ public struct USB3TransportInput: Sendable {
         self.generation = generation
         self.generationFamily = generationFamily
         self.tunneled = tunneled
+        self.transportRestricted = transportRestricted
     }
 }
 
@@ -699,12 +702,18 @@ extension PortManager {
     ) -> [LiveTransport] {
         var transports: [LiveTransport] = []
 
-        if let usb3 = usb3Transport.first(where: { $0.portNumber == portID && $0.active }) {
+        // Include a restricted link even when it is not active: macOS has
+        // negotiated a speed but blocked data, and we want to show that
+        // rather than silently dropping the port as idle.
+        if let usb3 = usb3Transport.first(where: {
+            $0.portNumber == portID && ($0.active || $0.transportRestricted)
+        }) {
             transports.append(LiveTransport(
                 kind: .usb,
                 dataRate: usb3.dataRate,
                 generation: usb3.generation,
-                tunneled: usb3.tunneled
+                tunneled: usb3.tunneled,
+                restricted: usb3.transportRestricted
             ))
         }
 

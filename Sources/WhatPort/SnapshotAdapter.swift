@@ -110,7 +110,8 @@ enum SnapshotAdapter {
                     dataRate: t.dataRate,
                     generation: t.generation,
                     generationFamily: t.generationFamily,
-                    tunneled: t.tunneled
+                    tunneled: t.tunneled,
+                    transportRestricted: t.transportRestricted
                 )
             },
             dpTransport: snapshot.dpTransport.map { t in

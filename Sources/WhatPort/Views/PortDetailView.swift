@@ -420,6 +420,13 @@ struct LaneBar: View {
         state.powerLevel == .on
     }
 
+    // macOS Transport Restriction Mode has blocked data on this lane.
+    // The link negotiated a speed but no data flows until the device is
+    // authorised (System Settings > Privacy & Security > Allow accessories).
+    private var isRestricted: Bool {
+        liveTransport?.restricted ?? false
+    }
+
     var body: some View {
         HStack(spacing: 6) {
             // Live power indicator: green dot when powered, dim when sleeping
@@ -447,6 +454,9 @@ struct LaneBar: View {
                         }
                     }
                 }
+                .help(isRestricted
+                    ? "Data blocked by macOS. Approve the device in System Settings > Privacy & Security > Allow accessories to connect."
+                    : "")
         }
     }
 
@@ -468,6 +478,8 @@ struct LaneBar: View {
 
     // Colored text on muted background instead of white on solid
     private var barTextColor: Color {
+        // A blocked link is a warning state, regardless of protocol.
+        if isRestricted { return .red }
         switch state.transport {
         case .thunderbolt: return .blue
         case .displayPort: return .orange
@@ -498,6 +510,14 @@ struct LaneBar: View {
             }
             return "DisplayPort"
         case .usb:
+            // A restricted link reports a speed but carries no data.
+            // Show that it is blocked rather than implying a healthy link.
+            if isRestricted {
+                if let lt = liveTransport, !lt.dataRate.isEmpty {
+                    return "USB3 \u{00B7} \(lt.dataRate) blocked"
+                }
+                return "USB3 \u{00B7} blocked"
+            }
             // Prefer live USB3 transport data, fall back to device speed
             if let lt = liveTransport, !lt.dataRate.isEmpty {
                 return "USB3 \u{00B7} \(lt.dataRate)"
