@@ -8,6 +8,13 @@ enum SnapshotAdapter {
     static func convert(_ snapshot: PortSnapshot) -> PortManagerSnapshot {
         PortManagerSnapshot(
             timestamp: snapshot.timestamp,
+            hpmPorts: snapshot.hpmPorts.map { hpm in
+                HPMPortInput(
+                    uuid: hpm.uuid,
+                    portNumber: hpm.portNumber,
+                    portType: hpm.portType
+                )
+            },
             phyData: snapshot.phyData.map { phy in
                 PhyInput(
                     phyID: phy.phyID,

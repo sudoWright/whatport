@@ -37,6 +37,7 @@ public final class PortManager: @unchecked Sendable {
         fullyCharged = snapshot.chargingPower?.fullyCharged ?? false
 
         let correlated = correlate(
+            hpmPorts: snapshot.hpmPorts,
             phyData: snapshot.phyData,
             tbData: snapshot.tbData,
             powerData: snapshot.powerData,
@@ -88,6 +89,7 @@ public final class PortManager: @unchecked Sendable {
 // don't require importing the IOKit module.
 public struct PortManagerSnapshot: Sendable {
     public let timestamp: Date
+    public let hpmPorts: [HPMPortInput]
     public let phyData: [PhyInput]
     public let tbData: [ThunderboltInput]
     public let powerData: [PowerInput]
@@ -105,6 +107,7 @@ public struct PortManagerSnapshot: Sendable {
 
     public init(
         timestamp: Date = .now,
+        hpmPorts: [HPMPortInput] = [],
         phyData: [PhyInput] = [],
         tbData: [ThunderboltInput] = [],
         powerData: [PowerInput] = [],
@@ -120,6 +123,7 @@ public struct PortManagerSnapshot: Sendable {
         cioTransport: [CIOTransportInput] = []
     ) {
         self.timestamp = timestamp
+        self.hpmPorts = hpmPorts
         self.phyData = phyData
         self.tbData = tbData
         self.powerData = powerData
@@ -252,6 +256,24 @@ public struct PowerInput: Sendable {
         self.configuredVoltage = configuredVoltage
         self.configuredCurrent = configuredCurrent
         self.vconnCurrent = vconnCurrent
+    }
+}
+
+// One physical port from the HPM controller layer. The authoritative port
+// roster, carrying the stable UUID identity.
+public struct HPMPortInput: Sendable {
+    public let uuid: String
+    public let portNumber: Int
+    public let portType: String   // "USB-C", "MagSafe 3", etc.
+
+    public var isMagSafe: Bool {
+        portType.lowercased().contains("magsafe")
+    }
+
+    public init(uuid: String, portNumber: Int, portType: String) {
+        self.uuid = uuid
+        self.portNumber = portNumber
+        self.portType = portType
     }
 }
 
@@ -484,6 +506,7 @@ extension PortManager {
     //    ID. Works when PHY count == port count but breaks when there are
     //    extra PHYs (e.g. M4 Pro has 4 PHYs for 3 ports).
     private func correlate(
+        hpmPorts: [HPMPortInput] = [],
         phyData: [PhyInput],
         tbData: [ThunderboltInput],
         powerData: [PowerInput],
@@ -515,9 +538,53 @@ extension PortManager {
         // Get unique socket IDs sorted (these are our physical ports)
         let socketIDs = tbBySocket.keys.sorted()
 
-        // If no TB data, use PHY port numbers (or PHY IDs + 1 as fallback)
-        if socketIDs.isEmpty {
-            var results = dedupedPhys.map { phy in
+        // Build PHY lookup for direct mapping
+        let phyByPort: [Int: PhyInput] = hasDirectMapping
+            ? Dictionary(
+                dedupedPhys.compactMap { $0.portNumber > 0 ? ($0.portNumber, $0) : nil },
+                uniquingKeysWith: { existing, _ in existing }
+              )
+            : [:]
+
+        // Picks the PHY for a port: direct by port number, else positional.
+        func phyFor(portNumber: Int, index: Int) -> PhyInput? {
+            if hasDirectMapping { return phyByPort[portNumber] }
+            return index < dedupedPhys.count ? dedupedPhys[index] : nil
+        }
+
+        // Build the USB-C port roster. The HPM controller layer is the
+        // authoritative source of physical ports and their stable UUID, so we
+        // prefer it. When there is no HPM node (Intel, desktop front ports, or
+        // tests) we fall back to Thunderbolt socket IDs, then PHY port numbers.
+        // All sources key the per-port data by the same "@N" number, which
+        // agrees across the HPM / PHY / TB / transport trees.
+        let usbcHPM = hpmPorts.filter { !$0.isMagSafe }.sorted { $0.portNumber < $1.portNumber }
+        var results: [PortState]
+
+        if !usbcHPM.isEmpty {
+            results = usbcHPM.enumerated().map { index, hpm in
+                var state = buildPortState(
+                    portID: hpm.portNumber,
+                    phy: phyFor(portNumber: hpm.portNumber, index: index),
+                    tb: tbBySocket[hpm.portNumber],
+                    power: powerData.first { $0.portIndex == hpm.portNumber },
+                    ccActive: ccByPort[hpm.portNumber] ?? false
+                )
+                state.uuid = hpm.uuid
+                return state
+            }
+        } else if !socketIDs.isEmpty {
+            results = socketIDs.enumerated().map { index, socketID in
+                buildPortState(
+                    portID: socketID,
+                    phy: phyFor(portNumber: socketID, index: index),
+                    tb: tbBySocket[socketID],
+                    power: powerData.first { $0.portIndex == socketID },
+                    ccActive: ccByPort[socketID] ?? false
+                )
+            }
+        } else {
+            results = dedupedPhys.map { phy in
                 let portID = phy.portNumber > 0 ? phy.portNumber : (phy.phyID + 1)
                 return buildPortState(
                     portID: portID,
@@ -527,51 +594,16 @@ extension PortManager {
                     ccActive: ccByPort[portID] ?? false
                 )
             }
-            // Attach charger power to the USB-C port with a USB-PD contract.
-            applyChargerPower(to: &results, chargerData: chargerData, chargingPower: chargingPower)
-            results.append(contentsOf: buildNonUSBCPorts(nonUSBCCC, chargerData: chargerData, chargingPower: chargingPower))
-            return results
-        }
-
-        // Build PHY lookup for direct mapping
-        let phyByPort: [Int: PhyInput] = {
-            guard hasDirectMapping else { return [:] }
-            return Dictionary(
-                dedupedPhys.compactMap { $0.portNumber > 0 ? ($0.portNumber, $0) : nil },
-                uniquingKeysWith: { existing, _ in existing }
-            )
-        }()
-
-        // Correlate each socket with its PHY data
-        var results: [PortState] = []
-        for (index, socketID) in socketIDs.enumerated() {
-            let phy: PhyInput?
-            if hasDirectMapping {
-                // Direct mapping: PHY portNumber matches socket ID
-                phy = phyByPort[socketID]
-            } else {
-                // Positional fallback: PHY sorted by ID maps to socket sorted by ID
-                phy = index < dedupedPhys.count ? dedupedPhys[index] : nil
-            }
-
-            let tb = tbBySocket[socketID]
-            let power = powerData.first { $0.portIndex == socketID }
-
-            results.append(buildPortState(
-                portID: socketID,
-                phy: phy,
-                tb: tb,
-                power: power,
-                ccActive: ccByPort[socketID] ?? false
-            ))
         }
 
         // Attach charger power to the USB-C port that negotiated a USB-PD
         // contract (power flows IN, so it never shows in PowerOutDetails).
         applyChargerPower(to: &results, chargerData: chargerData, chargingPower: chargingPower)
 
-        // Append non-USB-C ports (MagSafe, etc.) at the end
-        results.append(contentsOf: buildNonUSBCPorts(nonUSBCCC, chargerData: chargerData, chargingPower: chargingPower))
+        // Append non-USB-C ports (MagSafe, etc.), stamping their HPM UUID.
+        var nonUSBC = buildNonUSBCPorts(nonUSBCCC, chargerData: chargerData, chargingPower: chargingPower)
+        stampMagSafeUUIDs(&nonUSBC, hpmPorts: hpmPorts)
+        results.append(contentsOf: nonUSBC)
 
         // Build lookup dictionaries for enrichment data
         let devicesByPort = Dictionary(
@@ -791,6 +823,22 @@ extension PortManager {
                 configuredCurrent: charger.maxCurrent,
                 vconnCurrent: 0
             )
+        }
+    }
+
+    // Stamp the stable HPM UUID onto non-USB-C ports (MagSafe). These ports
+    // are built from CC data and keyed by id = 100 + portNumber, so we map
+    // back to the physical number to look up the HPM entry. No-op without HPM.
+    private func stampMagSafeUUIDs(_ ports: inout [PortState], hpmPorts: [HPMPortInput]) {
+        guard !hpmPorts.isEmpty else { return }
+        let magByNumber = Dictionary(
+            hpmPorts.filter { $0.isMagSafe }.map { ($0.portNumber, $0.uuid) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        for i in ports.indices where ports[i].portType == .magSafe {
+            if let uuid = magByNumber[ports[i].id - 100] {
+                ports[i].uuid = uuid
+            }
         }
     }
 

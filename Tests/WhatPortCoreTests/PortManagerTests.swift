@@ -255,3 +255,63 @@ import Testing
     #expect(magSafe.isActive)
     #expect(magSafe.primaryProtocol == .charging)
 }
+
+// The headline win of HPM-anchored correlation: USB-C@1 and MagSafe@1 share
+// the same "@N" number but get distinct stable UUIDs, so data can never bleed
+// between them. UUIDs taken from a real M5 MacBook Pro.
+@Test func portManagerStampsDistinctUUIDsForCollidingPortNumbers() {
+    let manager = PortManager()
+
+    let usbc1UUID = "6230AF2D-EE59-552E-E28A-652CCC0E7B11"
+    let usbc2UUID = "492BAF2D-4561-2E29-5FFE-BD2ADE023D0F"
+    let magSafeUUID = "7C30AF2D-CC71-7D20-5287-C77DB8476817"
+
+    let snapshot = PortManagerSnapshot(
+        hpmPorts: [
+            HPMPortInput(uuid: usbc1UUID, portNumber: 1, portType: "USB-C"),
+            HPMPortInput(uuid: usbc2UUID, portNumber: 2, portType: "USB-C"),
+            HPMPortInput(uuid: magSafeUUID, portNumber: 1, portType: "MagSafe 3"),
+        ],
+        phyData: [
+            PhyInput(phyID: 0, portNumber: 1),
+            PhyInput(phyID: 1, portNumber: 2),
+        ],
+        tbData: [
+            ThunderboltInput(socketID: 1),
+            ThunderboltInput(socketID: 2),
+        ],
+        ccData: [
+            CCInput(portNumber: 1, portType: "USB-C", active: false),
+            CCInput(portNumber: 2, portType: "USB-C", active: true),
+            CCInput(portNumber: 1, portType: "MagSafe 3", active: true),
+        ]
+    )
+
+    manager.applySnapshot(snapshot)
+
+    let usbc1 = manager.ports.first { $0.id == 1 && $0.portType == .usbC }
+    let magSafe = manager.ports.first { $0.portType == .magSafe }
+
+    #expect(usbc1?.uuid == usbc1UUID)
+    #expect(magSafe?.uuid == magSafeUUID)
+    // Same @N = 1, different physical port, different identity.
+    #expect(usbc1?.uuid != magSafe?.uuid)
+}
+
+// Without HPM data (Intel / desktop / tests), ports still correlate by number
+// and simply carry no UUID. Confirms the legacy fallback path is intact.
+@Test func portManagerCorrelatesWithoutHPMData() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        tbData: [ThunderboltInput(socketID: 1)],
+        ccData: [CCInput(portNumber: 1, portType: "USB-C", active: true)]
+    )
+
+    manager.applySnapshot(snapshot)
+
+    #expect(manager.ports.count == 1)
+    #expect(manager.ports[0].id == 1)
+    #expect(manager.ports[0].uuid == nil)
+}

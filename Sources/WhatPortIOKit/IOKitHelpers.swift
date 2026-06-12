@@ -126,6 +126,71 @@ func ioAncestorProperty(_ service: io_service_t, key: String, levels: Int) -> An
     return ioProperty(current, key: key)
 }
 
+// Get the IOKit registry entry name for a service (e.g. "Port-USB-C@4").
+//
+// Unlike the class name, this is the node's name in the service plane.
+// For HPM port-interface nodes it carries the "@N" physical port suffix.
+func ioEntryName(_ service: io_service_t) -> String? {
+    var buf = [CChar](repeating: 0, count: 128)
+    let kr = IORegistryEntryGetName(service, &buf)
+    guard kr == KERN_SUCCESS else { return nil }
+    let len = buf.firstIndex(of: 0) ?? buf.count
+    return String(decoding: buf[..<len].map { UInt8(bitPattern: $0) }, as: UTF8.self)
+}
+
+// Get the IOKit location-in-plane for a service, parsed as a hex integer.
+//
+// The "@N" suffix that ioreg shows on a node (e.g. "Port-USB-C@4") is the
+// node's location in the service plane, NOT part of its registry name. It is
+// rendered as hex, matching how socket IDs and port indices are read.
+func ioLocationInPlaneInt(_ service: io_service_t) -> Int? {
+    var buf = [CChar](repeating: 0, count: 128)
+    let kr = IORegistryEntryGetLocationInPlane(service, kIOServicePlane, &buf)
+    guard kr == KERN_SUCCESS else { return nil }
+    let len = buf.firstIndex(of: 0) ?? buf.count
+    let location = String(decoding: buf[..<len].map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    return Int(location, radix: 16)
+}
+
+// Walk the IOKit parent chain from `service` looking for an HPM power
+// controller node (class "AppleHPMDevice" or a subclass like
+// "AppleHPMDeviceHALType3" on M3+) and return its "UUID" property.
+//
+// The UUID is the stable per-physical-port identity. It lives only on the
+// HPM controller node, never on the port-interface node itself, so callers
+// that hold any descendant (interface, transport state, power source) can
+// walk up to it. Distinct per physical port, including MagSafe vs USB-C when
+// they share the same "@N" number.
+//
+// Returns nil if no HPM controller is found within `maxDepth` parent steps,
+// or the controller carries no UUID. Depth default of 12 matches what-cable:
+// large enough for deep subtrees (a power-source node sits ~4 levels below
+// the HPM device), the interface node is a direct child.
+func ioHPMControllerUUID(_ service: io_service_t, maxDepth: Int = 12) -> String? {
+    var current = service
+    IOObjectRetain(current)
+    defer { IOObjectRelease(current) }
+
+    for _ in 0..<maxDepth {
+        if let cls = ioClassName(current),
+           cls == "AppleHPMDevice" || cls.hasPrefix("AppleHPMDeviceHAL") {
+            if let uuid = ioProperty(current, key: "UUID") as? String, !uuid.isEmpty {
+                return uuid
+            }
+            // Found the controller but no UUID. Stop walking.
+            return nil
+        }
+
+        var parent: io_registry_entry_t = 0
+        guard IORegistryEntryGetParentEntry(current, kIOServicePlane, &parent) == KERN_SUCCESS else {
+            return nil
+        }
+        IOObjectRelease(current)
+        current = parent
+    }
+    return nil
+}
+
 // Get the IOKit class name for a service (e.g. "AppleT8132TypeCPhy").
 func ioClassName(_ service: io_service_t) -> String? {
     var buf = [CChar](repeating: 0, count: 128)

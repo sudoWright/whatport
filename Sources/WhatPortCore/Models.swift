@@ -7,6 +7,12 @@ import Foundation
 
 public struct PortState: Identifiable, Sendable {
     public let id: Int
+    // Stable per-physical-port identity from the HPM controller (the "UUID"
+    // property). Nil on Macs without an HPM node (Intel, desktop front ports)
+    // or when the roster falls back to port-number correlation. Internal join
+    // key only, never shown in the UI. Distinguishes MagSafe from USB-C when
+    // they share the same port number.
+    public var uuid: String?
     public var portType: PortType
     public var lane0: LaneState
     public var lane1: LaneState
@@ -64,6 +70,7 @@ public struct PortState: Identifiable, Sendable {
 
     public init(
         id: Int,
+        uuid: String? = nil,
         portType: PortType = .usbC,
         lane0: LaneState = .idle,
         lane1: LaneState = .idle,
@@ -79,6 +86,7 @@ public struct PortState: Identifiable, Sendable {
         thunderboltCapability: ThunderboltCapability? = nil
     ) {
         self.id = id
+        self.uuid = uuid
         self.portType = portType
         self.lane0 = lane0
         self.lane1 = lane1

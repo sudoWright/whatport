@@ -14,6 +14,7 @@ public protocol PortDataSource: Sendable {
 // The IOKit layer produces one of these on every notification or poll tick.
 public struct PortSnapshot: Sendable {
     public let timestamp: Date
+    public let hpmPorts: [RawHPMPort]
     public let phyData: [RawPhyData]
     public let thunderboltData: [RawThunderboltData]
     public let powerData: [RawPowerData]
@@ -31,6 +32,7 @@ public struct PortSnapshot: Sendable {
 
     public init(
         timestamp: Date = .now,
+        hpmPorts: [RawHPMPort] = [],
         phyData: [RawPhyData] = [],
         thunderboltData: [RawThunderboltData] = [],
         powerData: [RawPowerData] = [],
@@ -46,6 +48,7 @@ public struct PortSnapshot: Sendable {
         cioTransport: [RawCIOTransportState] = []
     ) {
         self.timestamp = timestamp
+        self.hpmPorts = hpmPorts
         self.phyData = phyData
         self.thunderboltData = thunderboltData
         self.powerData = powerData
@@ -69,6 +72,7 @@ public enum SnapshotReader {
     public static func takeSnapshot() -> PortSnapshot {
         PortSnapshot(
             timestamp: .now,
+            hpmPorts: HPMReader.readAll(),
             phyData: PhyReader.readAll(),
             thunderboltData: ThunderboltReader.readAll(),
             powerData: PowerReader.readAll(),

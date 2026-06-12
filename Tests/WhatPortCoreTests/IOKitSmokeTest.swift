@@ -24,8 +24,24 @@ import Testing
     }
 }
 
+@Test func hpmReaderFindsPortsWithUUIDs() {
+    let ports = HPMReader.readAll()
+    #expect(!ports.isEmpty, "Expected at least one HPM port-controller node on Apple Silicon")
+
+    for port in ports {
+        #expect(!port.uuid.isEmpty, "Each HPM port should carry a UUID")
+        #expect(port.portNumber > 0, "Each HPM port should have a positive port number")
+    }
+
+    // UUIDs must be unique per physical port, even when MagSafe and USB-C
+    // share the same "@N" number (the whole point of using them).
+    let uuids = ports.map(\.uuid)
+    #expect(Set(uuids).count == uuids.count, "HPM port UUIDs should be unique")
+}
+
 @Test func snapshotReaderProducesCompleteSnapshot() {
     let snapshot = SnapshotReader.takeSnapshot()
     #expect(!snapshot.phyData.isEmpty)
     #expect(!snapshot.thunderboltData.isEmpty)
+    #expect(!snapshot.hpmPorts.isEmpty)
 }
