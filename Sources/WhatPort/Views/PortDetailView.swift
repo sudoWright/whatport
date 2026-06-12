@@ -11,7 +11,8 @@ struct PortDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                portHeader
                 cardContent
             }
             .padding(16)
@@ -20,106 +21,153 @@ struct PortDetailView: View {
 
     private var chartTint: Color { .blue }
 
+    // MARK: - Port Identity Header
+
+    private var portHeader: some View {
+        HStack(alignment: .center) {
+            Text(portName)
+                .font(.title3.weight(.semibold))
+            Spacer()
+            protocolChip
+        }
+    }
+
+    private var portName: String {
+        switch port.portType {
+        case .magSafe: return "MagSafe"
+        case .usbC: return "Port \(port.id)"
+        }
+    }
+
+    private var protocolChip: some View {
+        let (label, color) = protocolChipInfo
+        return Text(label)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.12), in: Capsule())
+    }
+
+    private var protocolChipInfo: (String, Color) {
+        switch port.primaryProtocol {
+        case .thunderbolt: return ("Thunderbolt", .blue)
+        case .displayPort:  return ("DisplayPort", .orange)
+        case .usbOnly:      return ("USB", .green)
+        case .charging:     return ("Charging", .yellow)
+        case .idle:         return ("Idle", .gray)
+        }
+    }
+
+    // MARK: - Card Container
+
+    // Small-caps style section header: recedes so the values lead the eye.
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+    }
+
+    private func sectionCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) { content() }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+    }
+
     // MARK: - Card Content (protocol-specific ordering)
 
     @ViewBuilder
     private var cardContent: some View {
         switch port.primaryProtocol {
         case .charging:
-            powerSection
+            sectionCard { powerSection }
             if !powerHistory.isEmpty {
-                Divider()
-                powerChart
+                sectionCard { powerChart }
             }
             if port.portType != .magSafe {
-                Divider()
-                laneInfoSection
+                sectionCard { laneInfoSection }
                 if let cap = port.thunderboltCapability {
-                    Divider()
-                    thunderboltSection(capability: cap, link: port.thunderboltLink)
+                    sectionCard { thunderboltSection(capability: cap, link: port.thunderboltLink) }
                 }
                 if let cable = port.cable {
-                    Divider()
-                    cableSection(cable)
+                    sectionCard { cableSection(cable) }
                 }
             }
 
         case .usbOnly:
             if let device = port.usbDevice {
-                deviceSection(device)
-                Divider()
+                sectionCard {
+                    deviceSection(device)
+                    displayResolutionRow
+                }
             }
-            laneInfoSection
+            sectionCard { laneInfoSection }
             if let cap = port.thunderboltCapability {
-                Divider()
-                thunderboltSection(capability: cap, link: port.thunderboltLink)
+                sectionCard { thunderboltSection(capability: cap, link: port.thunderboltLink) }
             }
             if let cable = port.cable {
-                Divider()
-                cableSection(cable)
+                sectionCard { cableSection(cable) }
             }
-            Divider()
-            powerSection
+            sectionCard { powerSection }
             if !powerHistory.isEmpty {
-                Divider()
-                powerChart
+                sectionCard { powerChart }
             }
 
         case .thunderbolt:
             if let device = port.usbDevice {
-                deviceSection(device)
-                Divider()
+                sectionCard {
+                    deviceSection(device)
+                    displayResolutionRow
+                }
+            } else if port.displayWidth > 0 && port.displayHeight > 0 {
+                // Display with no USB device (e.g. a pure DP monitor): the
+                // resolution still gets a card rather than floating loose.
+                sectionCard { displayResolutionRow }
             }
-            displayResolutionRow
             if let cap = port.thunderboltCapability {
-                thunderboltSection(capability: cap, link: port.thunderboltLink)
-                Divider()
+                sectionCard { thunderboltSection(capability: cap, link: port.thunderboltLink) }
             }
-            laneInfoSection
+            sectionCard { laneInfoSection }
             if let cable = port.cable {
-                Divider()
-                cableSection(cable)
+                sectionCard { cableSection(cable) }
             }
-            Divider()
-            powerSection
+            sectionCard { powerSection }
             if !powerHistory.isEmpty {
-                Divider()
-                powerChart
+                sectionCard { powerChart }
             }
 
         case .displayPort:
             if let device = port.usbDevice {
-                deviceSection(device)
-                Divider()
+                sectionCard {
+                    deviceSection(device)
+                    displayResolutionRow
+                }
+            } else if port.displayWidth > 0 && port.displayHeight > 0 {
+                sectionCard { displayResolutionRow }
             }
-            displayResolutionRow
-            laneInfoSection
+            sectionCard { laneInfoSection }
             if let cap = port.thunderboltCapability {
-                Divider()
-                thunderboltSection(capability: cap, link: port.thunderboltLink)
+                sectionCard { thunderboltSection(capability: cap, link: port.thunderboltLink) }
             }
             if let cable = port.cable {
-                Divider()
-                cableSection(cable)
+                sectionCard { cableSection(cable) }
             }
-            Divider()
-            powerSection
+            sectionCard { powerSection }
             if !powerHistory.isEmpty {
-                Divider()
-                powerChart
+                sectionCard { powerChart }
             }
 
         case .idle:
-            laneInfoSection
+            sectionCard { laneInfoSection }
             if let cap = port.thunderboltCapability {
-                Divider()
-                thunderboltSection(capability: cap, link: port.thunderboltLink)
+                sectionCard { thunderboltSection(capability: cap, link: port.thunderboltLink) }
             }
-            Divider()
-            powerSection
+            sectionCard { powerSection }
             if !powerHistory.isEmpty {
-                Divider()
-                powerChart
+                sectionCard { powerChart }
             }
         }
     }
@@ -128,9 +176,7 @@ struct PortDetailView: View {
 
     private func deviceSection(_ device: USBDeviceInfo) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Device")
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(.secondary)
+            sectionHeader("Device")
 
             HStack {
                 Text(device.productName)
@@ -186,9 +232,7 @@ struct PortDetailView: View {
 
     private var laneInfoSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Lanes (live)")
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(.secondary)
+            sectionHeader("Link activity")
             LaneBar(
                 label: "Lane 0",
                 state: port.lane0,
@@ -292,9 +336,7 @@ struct PortDetailView: View {
 
     private var powerSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Power")
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(.secondary)
+            sectionHeader("Power")
 
             if let power = port.power {
                 HStack {
@@ -356,7 +398,7 @@ struct PortDetailView: View {
 
     private var powerChart: some View {
         // Compute scale values once so both .chartYScale and .chartYAxis use the same range.
-        // Small range (≤ 2 W): keep one-decimal precision so 0.5-steps show.
+        // Small range (<=2 W): keep one-decimal precision so 0.5-steps show.
         // Larger range: round ceiling up to the next even number so mid is
         // always a whole watt and integer labels are used.
         let maxSample = powerHistory.map(\.watts).max() ?? 0
@@ -366,9 +408,7 @@ struct PortDetailView: View {
         let fmt = ceiling <= 2.0 ? "%.1fW" : "%.0fW"
 
         return VStack(alignment: .leading, spacing: 8) {
-            Text("Power (60s)")
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(.secondary)
+            sectionHeader("Power (60s)")
             Chart(powerHistory.indices, id: \.self) { index in
                 let sample = powerHistory[index]
                 AreaMark(
@@ -396,7 +436,7 @@ struct PortDetailView: View {
             .chartXAxis(.hidden)
             .chartYScale(domain: 0...ceiling)
             .chartYAxis {
-                // 3 ticks: 0, mid, ceiling — all within the pinned 0...ceiling domain.
+                // 3 ticks: 0, mid, ceiling -- all within the pinned 0...ceiling domain.
                 AxisMarks(position: .leading, values: [0, mid, ceiling]) { value in
                     AxisValueLabel {
                         if let w = value.as(Double.self) {
@@ -424,9 +464,7 @@ struct PortDetailView: View {
         link: ThunderboltLinkState?
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Thunderbolt")
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(.secondary)
+            sectionHeader("Thunderbolt")
 
             // Current negotiated link
             if let link {
@@ -459,9 +497,7 @@ struct PortDetailView: View {
 
     private func cableSection(_ cable: CableInfo) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Cable")
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(.secondary)
+            sectionHeader("Cable")
             HStack(spacing: 12) {
                 LabeledValue(label: "Type", value: cable.productType)
                 if cable.pdRevision > 0 {
@@ -546,7 +582,7 @@ struct LaneBar: View {
 
     // Muted tinted fill instead of solid color
     private var barFill: Color {
-        // A blocked USB lane is a warning state — amber fill, not healthy green.
+        // A blocked USB lane is a warning state -- amber fill, not healthy green.
         if isRestricted { return .orange.opacity(isLanePowered ? 0.12 : 0.06) }
         let opacity = isLanePowered ? 0.12 : 0.06
         switch state.transport {
@@ -559,7 +595,7 @@ struct LaneBar: View {
 
     // Colored text on muted background instead of white on solid
     private var barTextColor: Color {
-        // A blocked lane is a warning state — amber text matches the amber fill.
+        // A blocked lane is a warning state -- amber text matches the amber fill.
         if isRestricted { return .orange }
         switch state.transport {
         case .thunderbolt: return .blue
@@ -592,7 +628,7 @@ struct LaneBar: View {
             return "DisplayPort"
         case .usb:
             // A restricted link has no active data flow; IOKit reports "None"
-            // as the data rate. Skip the rate entirely — just label it blocked.
+            // as the data rate. Skip the rate entirely -- just label it blocked.
             if isRestricted {
                 return "USB3 \u{00B7} Blocked"
             }
@@ -659,7 +695,7 @@ struct LabeledValue: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.subheadline.weight(.bold))
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(.primary)
         }
     }
