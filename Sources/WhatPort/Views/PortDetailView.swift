@@ -290,7 +290,17 @@ struct PortDetailView: View {
     // MARK: - Power Chart
 
     private var powerChart: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        // Compute scale values once so both .chartYScale and .chartYAxis use the same range.
+        // Small range (≤ 2 W): keep one-decimal precision so 0.5-steps show.
+        // Larger range: round ceiling up to the next even number so mid is
+        // always a whole watt and integer labels are used.
+        let maxSample = powerHistory.map(\.watts).max() ?? 0
+        let rawCeil = max(1.0, ceil(maxSample))
+        let ceiling: Double = rawCeil <= 2.0 ? rawCeil : (rawCeil.truncatingRemainder(dividingBy: 2) == 0 ? rawCeil : rawCeil + 1)
+        let mid = ceiling / 2
+        let fmt = ceiling <= 2.0 ? "%.1fW" : "%.0fW"
+
+        return VStack(alignment: .leading, spacing: 8) {
             Text("Power (60s)")
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(.secondary)
@@ -319,11 +329,13 @@ struct PortDetailView: View {
                 .interpolationMethod(.catmullRom)
             }
             .chartXAxis(.hidden)
+            .chartYScale(domain: 0...ceiling)
             .chartYAxis {
-                AxisMarks(position: .leading) { value in
+                // 3 ticks: 0, mid, ceiling — all within the pinned 0...ceiling domain.
+                AxisMarks(position: .leading, values: [0, mid, ceiling]) { value in
                     AxisValueLabel {
                         if let w = value.as(Double.self) {
-                            Text(String(format: "%.0fW", w))
+                            Text(String(format: fmt, w))
                                 .font(.system(size: 12))
                         }
                     }
