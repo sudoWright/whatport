@@ -274,6 +274,16 @@ public enum TBGeneration: Sendable, Equatable {
 
 // MARK: - Port Power
 
+// Which way power is flowing across the port, from the Mac's point of view.
+//   .incoming - a charger or powered dock is delivering power INTO the Mac.
+//   .outgoing - the Mac is sourcing power OUT to a bus-powered device.
+// Summing the two is meaningless (they are opposite directions), so the UI
+// reports them separately rather than as one total.
+public enum PowerDirection: Sendable, Equatable {
+    case incoming
+    case outgoing
+}
+
 public struct PortPower: Sendable, Equatable {
     public var watts: Double
     public var current: Int
@@ -281,6 +291,7 @@ public struct PortPower: Sendable, Equatable {
     public var configuredVoltage: Int
     public var configuredCurrent: Int
     public var vconnCurrent: Int
+    public var direction: PowerDirection
 
     public init(
         watts: Double,
@@ -288,7 +299,8 @@ public struct PortPower: Sendable, Equatable {
         voltage: Int,
         configuredVoltage: Int,
         configuredCurrent: Int,
-        vconnCurrent: Int
+        vconnCurrent: Int,
+        direction: PowerDirection = .outgoing
     ) {
         self.watts = watts
         self.current = current
@@ -296,6 +308,7 @@ public struct PortPower: Sendable, Equatable {
         self.configuredVoltage = configuredVoltage
         self.configuredCurrent = configuredCurrent
         self.vconnCurrent = vconnCurrent
+        self.direction = direction
     }
 }
 

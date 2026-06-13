@@ -92,8 +92,8 @@ struct PortListView: View {
                     Text("\(portManager.activePortCount)/\(portManager.portCount) active")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    if portManager.totalWatts > 0 {
-                        Text(WattsFormat.string(portManager.totalWatts) + " total")
+                    if !headerPowerLabel.isEmpty {
+                        Text(headerPowerLabel)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -102,6 +102,24 @@ struct PortListView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 16)
+    }
+
+    // Builds the power summary string for the header.
+    // Shows "X W in", "X W out", or both joined by " · " when both directions are active.
+    // Returns empty string when no power is flowing so the caller can hide the label.
+    private var headerPowerLabel: String {
+        let inWatts = portManager.totalWattsIn
+        let outWatts = portManager.totalWattsOut
+        switch (inWatts > 0, outWatts > 0) {
+        case (true, true):
+            return WattsFormat.string(inWatts) + " in \u{00B7} " + WattsFormat.string(outWatts) + " out"
+        case (true, false):
+            return WattsFormat.string(inWatts) + " in"
+        case (false, true):
+            return WattsFormat.string(outWatts) + " out"
+        case (false, false):
+            return ""
+        }
     }
 
     private var emptyState: some View {

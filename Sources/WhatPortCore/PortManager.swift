@@ -77,9 +77,18 @@ public final class PortManager: @unchecked Sendable {
         ports.filter { $0.isActive }.count
     }
 
-    // Sum of watts across all ports that are sourcing/sinking power
-    public var totalWatts: Double {
-        ports.compactMap { $0.power?.watts }.reduce(0, +)
+    // Total power flowing INTO the Mac (chargers, powered docks).
+    public var totalWattsIn: Double {
+        ports.compactMap { $0.power }
+            .filter { $0.direction == .incoming }
+            .reduce(0) { $0 + $1.watts }
+    }
+
+    // Total power the Mac is sourcing OUT to bus-powered devices.
+    public var totalWattsOut: Double {
+        ports.compactMap { $0.power }
+            .filter { $0.direction == .outgoing }
+            .reduce(0) { $0 + $1.watts }
     }
 }
 
@@ -878,7 +887,8 @@ extension PortManager {
                 voltage: chargingPower?.systemVoltageIn ?? charger.voltage,
                 configuredVoltage: charger.voltage,
                 configuredCurrent: charger.maxCurrent,
-                vconnCurrent: 0
+                vconnCurrent: 0,
+                direction: .incoming
             )
         }
     }
@@ -911,7 +921,8 @@ extension PortManager {
                 voltage: Int((channel.volts * 1000).rounded()),
                 configuredVoltage: 0,
                 configuredCurrent: 0,
-                vconnCurrent: 0
+                vconnCurrent: 0,
+                direction: .outgoing
             )
         }
     }
@@ -966,7 +977,8 @@ extension PortManager {
                     voltage: cp.systemVoltageIn,
                     configuredVoltage: cp.systemVoltageIn,
                     configuredCurrent: cp.systemCurrentIn,
-                    vconnCurrent: 0
+                    vconnCurrent: 0,
+                    direction: .incoming
                 )
             }
 
@@ -1010,7 +1022,8 @@ extension PortManager {
                 voltage: pwr.adapterVoltage,
                 configuredVoltage: pwr.configuredVoltage,
                 configuredCurrent: pwr.configuredCurrent,
-                vconnCurrent: pwr.vconnCurrent
+                vconnCurrent: pwr.vconnCurrent,
+                direction: .outgoing
             )
         }
 
