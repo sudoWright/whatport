@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WhatPort Pro - Purchase complete</title>
+    <meta name="robots" content="noindex">
+
+    <link rel="icon" href="icon.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #0e1620;
+        --ink-soft: #364152;
+        --muted: #6a7585;
+        --line: #e3e8ef;
+        --bg: #fafbfc;
+        --panel: #ffffff;
+        --accent: #2563eb;
+        --accent-strong: #1d4ed8;
+        --accent-soft: #eff6ff;
+        --good: #0b8a5a;
+        --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+        --shadow-md: 0 6px 16px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 16px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+      }
+
+      a { color: inherit; text-decoration: none; }
+      img { display: block; max-width: 100%; }
+      h1, h2, h3, p { margin: 0; }
+
+      .wrap {
+        width: min(520px, 100%);
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: var(--shadow-md);
+        padding: 48px 40px 40px;
+        text-align: center;
+      }
+
+      .card-mark {
+        display: inline-block;
+        margin-bottom: 24px;
+      }
+
+      .card-mark img {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .card h1 {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--ink);
+        line-height: 1.2;
+        margin-bottom: 16px;
+      }
+
+      .card p {
+        color: var(--ink-soft);
+        font-size: 15px;
+        line-height: 1.6;
+        margin-bottom: 12px;
+      }
+
+      .card p:last-of-type { margin-bottom: 0; }
+
+      .status-area {
+        margin: 24px 0;
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        border: 3px solid var(--line);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.75s linear infinite;
+        margin-bottom: 12px;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      .status-label {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .success-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: #dcfce7;
+        color: var(--good);
+        margin-bottom: 12px;
+      }
+
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 28px;
+      }
+
+      .button {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 18px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 15px;
+        font-family: inherit;
+        line-height: 1;
+        cursor: pointer;
+        text-decoration: none;
+        transition: transform 0.06s ease, background 0.15s ease, border-color 0.15s ease;
+      }
+
+      .button:active { transform: translateY(1px); }
+
+      .button.primary {
+        background: var(--ink);
+        color: #fff;
+      }
+      .button.primary:hover { background: #1c2735; }
+
+      .button.secondary {
+        background: var(--panel);
+        color: var(--ink);
+        border-color: var(--line);
+      }
+      .button.secondary:hover { border-color: #c8d0db; }
+
+      .button .arrow { transition: transform 0.15s ease; }
+      .button:hover .arrow { transform: translateX(2px); }
+
+      .support-note {
+        margin-top: 20px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .support-note a {
+        color: var(--accent);
+        text-decoration: underline;
+      }
+
+      .key-note {
+        margin-top: 16px;
+        padding: 14px 16px;
+        background: var(--accent-soft);
+        border-radius: 8px;
+        font-size: 14px;
+        color: var(--ink-soft);
+        text-align: left;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <a class="card-mark" href="/">
+          <img src="icon.png" alt="WhatPort home" width="56" height="56">
+        </a>
+
+        <div id="status-area" class="status-area">
+          <div class="spinner" id="spinner" aria-hidden="true"></div>
+          <p class="status-label" id="status-label">Confirming your purchase...</p>
+        </div>
+
+        <div id="content-area"></div>
+
+        <div class="actions" id="actions-area" hidden>
+          <a class="button secondary" href="/">
+            Back to whatport.app
+            <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+
+        <p class="support-note">Questions? Email <a href="mailto:support@whatport.uk">support@whatport.uk</a></p>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var spinnerEl = document.getElementById('spinner');
+        var statusLabel = document.getElementById('status-label');
+        var contentArea = document.getElementById('content-area');
+        var actionsArea = document.getElementById('actions-area');
+
+        function showActions() {
+          if (actionsArea) actionsArea.hidden = false;
+        }
+
+        function hideSpinner() {
+          if (spinnerEl) spinnerEl.hidden = true;
+          if (statusLabel) statusLabel.hidden = true;
+        }
+
+        function showSuccess() {
+          hideSpinner();
+          contentArea.innerHTML =
+            '<div class="success-icon" aria-hidden="true">' +
+              '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' +
+            '</div>' +
+            '<h1>Your licence key is on its way.</h1>' +
+            '<p>We have emailed your key to the address you used at checkout. Open WhatPort, click Flight Recorder, and paste the key into the License Key field to unlock Pro.</p>' +
+            '<div class="key-note">' +
+              'It can take a minute to arrive. If you do not see it, check your spam folder. ' +
+              'Each key works on up to 2 Macs.' +
+            '</div>';
+          showActions();
+        }
+
+        function showProcessing() {
+          hideSpinner();
+          contentArea.innerHTML =
+            '<h1>Thanks for buying WhatPort Pro.</h1>' +
+            '<p>Payment received. Your licence key is being generated and will arrive by email shortly.</p>' +
+            '<p>If it does not arrive within 10 minutes, contact <a href="mailto:support@whatport.uk" style="color:var(--accent)">support@whatport.uk</a>.</p>';
+          showActions();
+        }
+
+        function showNotCompleted() {
+          hideSpinner();
+          contentArea.innerHTML =
+            '<h1>Checkout not completed.</h1>' +
+            '<p>This checkout session was not completed. No payment has been taken.</p>';
+          actionsArea.innerHTML =
+            '<a class="button primary" href="/#pro">' +
+              'Try again' +
+              '<svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>' +
+            '</a>' +
+            '<a class="button secondary" href="/">Back to whatport.app</a>';
+          showActions();
+        }
+
+        function showNoSession() {
+          hideSpinner();
+          contentArea.innerHTML =
+            '<h1>Thanks for your purchase.</h1>' +
+            '<p>Check your email for your licence key. It can take a minute to arrive.</p>';
+          showActions();
+        }
+
+        function getParam(name) {
+          try {
+            return new URLSearchParams(window.location.search).get(name);
+          } catch (e) {
+            return null;
+          }
+        }
+
+        var sessionId = getParam('session_id');
+
+        if (!sessionId) {
+          showNoSession();
+          return;
+        }
+
+        var attempts = 0;
+        var maxAttempts = 10;
+
+        function poll() {
+          attempts++;
+          fetch('https://whatport.uk/api/session-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: sessionId })
+          })
+          .then(function (res) {
+            if (!res.ok) {
+              throw new Error('HTTP error ' + res.status);
+            }
+            return res.json();
+          })
+          .then(function (data) {
+            var status = data.status;
+            var licenceIssued = data.licenceIssued;
+
+            if (status === 'paid' || licenceIssued === true) {
+              showSuccess();
+              return;
+            }
+
+            if (status === 'expired' || status === 'unpaid') {
+              showNotCompleted();
+              return;
+            }
+
+            // processing, unknown, or anything else
+            if (attempts >= maxAttempts) {
+              showProcessing();
+              return;
+            }
+
+            setTimeout(poll, 2000);
+          })
+          .catch(function () {
+            if (attempts >= maxAttempts) {
+              // Reassuring fallback: if they have a session_id they likely paid
+              showProcessing();
+              return;
+            }
+            setTimeout(poll, 2000);
+          });
+        }
+
+        poll();
+      })();
+    </script>
+  </body>
+</html>
