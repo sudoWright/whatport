@@ -16,7 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
-        if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "png"),
+        if let iconURL = Bundle.whatPortResources.url(forResource: "AppIcon", withExtension: "png"),
            let iconImage = NSImage(contentsOf: iconURL) {
             NSApplication.shared.applicationIconImage = iconImage
         }
@@ -63,7 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         guard let button = statusItem?.button else { return }
 
-        if let iconURL = Bundle.module.url(forResource: "MenuBarIcon", withExtension: "png") {
+        if let iconURL = Bundle.whatPortResources.url(forResource: "MenuBarIcon", withExtension: "png") {
             let image = NSImage(contentsOf: iconURL)
             image?.isTemplate = true  // lets macOS handle light/dark mode
             image?.size = NSSize(width: 18, height: 18)
