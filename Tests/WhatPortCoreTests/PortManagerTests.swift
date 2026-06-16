@@ -89,7 +89,7 @@ import Testing
 @Test func portManagerTracksPowerHistory() {
     let manager = PortManager()
 
-    for i in 0..<25 {
+    for i in 0..<65 {
         let snapshot = PortManagerSnapshot(
             phyData: [PhyInput(phyID: 0)],
             tbData: [ThunderboltInput(socketID: 1)],
@@ -99,8 +99,8 @@ import Testing
     }
 
     let history = manager.powerHistory[1] ?? []
-    #expect(history.count == 20) // capped at maxPowerSamples
-    #expect(history.last?.watts == 24.0) // last sample: 24000 mW = 24.0W
+    #expect(history.count == 60) // capped at maxPowerSamples
+    #expect(history.last?.watts == 64.0) // last sample: 64000 mW = 64.0W
 }
 
 @Test func portManagerDeduplicatesTBAdapters() {
@@ -355,6 +355,102 @@ import Testing
     manager.applySnapshot(snapshot)
 
     #expect(manager.ports.first { $0.id == 1 }?.power == nil)
+}
+
+// The SMC is the primary per-port source. Where a channel resolves to a port,
+// its live watts/volts/amps override the (frozen) PowerOutDetails reading, but
+// the PD contract from PowerOutDetails is carried over since the SMC lacks it.
+@Test func portManagerSMCOverridesPowerOutDetailsButKeepsContract() {
+    let manager = PortManager()
+    let uuid = "6230AF2D-EE59-552E-E28A-652CCC0E7B11"
+    let smcUUID = uuid.replacingOccurrences(of: "-", with: "").lowercased()
+
+    let snapshot = PortManagerSnapshot(
+        hpmPorts: [HPMPortInput(uuid: uuid, portNumber: 1, portType: "USB-C")],
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        powerData: [
+            // Frozen PowerOutDetails reading: 5 W at 9 V, with a 20 V / 3 A contract.
+            PowerInput(
+                portIndex: 1,
+                watts: 5000,
+                adapterVoltage: 9000,
+                configuredVoltage: 20000,
+                configuredCurrent: 3000,
+                vconnCurrent: 150
+            ),
+        ],
+        smcPortPower: [
+            // Live SMC channel: 30 W (15 V x 2 A).
+            SMCPortPowerInput(present: true, volts: 15.0, amps: 2.0, uuid: smcUUID),
+        ]
+    )
+
+    manager.applySnapshot(snapshot)
+    let port1 = manager.ports.first { $0.id == 1 }
+
+    // Live draw comes from the SMC.
+    #expect(port1?.power?.watts == 30.0)
+    #expect(port1?.power?.voltage == 15000)
+    #expect(port1?.power?.current == 2000)
+    #expect(port1?.power?.direction == .outgoing)
+    // PD contract is carried over from PowerOutDetails.
+    #expect(port1?.power?.configuredVoltage == 20000)
+    #expect(port1?.power?.configuredCurrent == 3000)
+    #expect(port1?.power?.vconnCurrent == 150)
+}
+
+// On a port with a PowerOutDetails reading but no resolving SMC channel (M1/M2,
+// or any unresolved port), the PowerOutDetails reading stands unchanged.
+@Test func portManagerKeepsPowerOutDetailsWhenNoSMCChannelResolves() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        hpmPorts: [HPMPortInput(uuid: "6230AF2D-EE59-552E-E28A-652CCC0E7B11", portNumber: 1, portType: "USB-C")],
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        powerData: [
+            PowerInput(portIndex: 1, watts: 5000, adapterVoltage: 9000,
+                       configuredVoltage: 20000, configuredCurrent: 3000),
+        ],
+        smcPortPower: [
+            // Resolves to a different port's UUID, so port 1 is untouched.
+            SMCPortPowerInput(present: true, volts: 5.0, amps: 1.0,
+                              uuid: "ffffffffffffffffffffffffffffffff"),
+        ]
+    )
+
+    manager.applySnapshot(snapshot)
+    let port1 = manager.ports.first { $0.id == 1 }
+
+    #expect(port1?.power?.watts == 5.0)
+    #expect(port1?.power?.voltage == 9000)   // adapterVoltage, untouched by SMC
+    #expect(port1?.power?.configuredVoltage == 20000)
+}
+
+// The SMC measures power OUT, so it must never override an incoming (charger)
+// reading on a charging port, even when a channel resolves to that port.
+@Test func portManagerSMCDoesNotOverrideIncomingChargerPower() {
+    let manager = PortManager()
+    let uuid = "6230AF2D-EE59-552E-E28A-652CCC0E7B11"
+    let smcUUID = uuid.replacingOccurrences(of: "-", with: "").lowercased()
+
+    let snapshot = PortManagerSnapshot(
+        hpmPorts: [HPMPortInput(uuid: uuid, portNumber: 1, portType: "USB-C")],
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        ccData: [CCInput(portNumber: 1, portType: "USB-C", active: true)],
+        chargerData: [ChargerInput(portType: "USB-C", portNumber: 1, voltage: 20000, maxCurrent: 5000)],
+        chargingPower: ChargingPowerInput(systemPowerIn: 60000, systemVoltageIn: 20000,
+                                          systemCurrentIn: 3000, isCharging: true),
+        smcPortPower: [
+            SMCPortPowerInput(present: true, volts: 5.0, amps: 1.0, uuid: smcUUID),
+        ]
+    )
+
+    manager.applySnapshot(snapshot)
+    let port1 = manager.ports.first { $0.id == 1 }
+
+    // The charger (incoming) reading stands; the SMC's outgoing 5 W is ignored.
+    #expect(port1?.power?.direction == .incoming)
+    #expect(port1?.power?.watts == 60.0)
 }
 
 // HPM health data flows through to PortState.health; a port with no

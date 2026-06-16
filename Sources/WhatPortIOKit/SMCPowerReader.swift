@@ -26,8 +26,21 @@ public struct RawSMCPortPower: Sendable {
     public var watts: Double { volts * amps }
 }
 
-public final class SMCPowerReader {
+// System DC-in (wall / charger) power from the SMC rails. Live (~1 Hz), unlike
+// AppleSmartBattery.SystemPowerIn which freezes under load on Apple Silicon.
+public struct RawSMCSystemPower: Sendable {
+    public let volts: Double      // VD0R, DC-in voltage
+    public let amps: Double       // ID0R, DC-in current
+    public let watts: Double      // PDTR, or volts * amps when PDTR is absent
+}
+
+// @unchecked Sendable: the AppleSMC connection is a single io_connect_t guarded
+// by `lock`, so one persisted instance can be shared across the notifier queue
+// and the poll task. Every public entry point takes the lock before touching the
+// connection, serialising the IOConnectCallStructMethod calls.
+public final class SMCPowerReader: @unchecked Sendable {
     private var connection: io_connect_t = 0
+    private let lock = NSLock()
 
     public init() {
         // The kernel reads this struct at fixed C offsets and rejects any other
@@ -44,6 +57,23 @@ public final class SMCPowerReader {
     // is missing or the open is refused.
     @discardableResult
     public func open() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return openLocked()
+    }
+
+    public func close() {
+        lock.lock()
+        defer { lock.unlock() }
+        if connection != 0 {
+            IOServiceClose(connection)
+            connection = 0
+        }
+    }
+
+    // Assumes `lock` is held. Used directly by readPortPowerChannels (which
+    // already holds the lock) to avoid re-entering the non-recursive NSLock.
+    private func openLocked() -> Bool {
         if connection != 0 { return true }
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSMC"))
         guard service != 0 else { return false }
@@ -54,17 +84,13 @@ public final class SMCPowerReader {
         return true
     }
 
-    public func close() {
-        if connection != 0 {
-            IOServiceClose(connection)
-            connection = 0
-        }
-    }
-
     // Reads channels D1..D4. A channel is only returned when it has a usable
-    // DxUI, since without it the channel can't be tied to a port.
+    // DxUI, since without it the channel can't be tied to a port. The lock is
+    // held for the whole read so concurrent callers serialise on the connection.
     public func readPortPowerChannels() -> [RawSMCPortPower] {
-        guard open() else { return [] }
+        lock.lock()
+        defer { lock.unlock() }
+        guard openLocked() else { return [] }
         var channels: [RawSMCPortPower] = []
         for index in 1...4 {
             guard let uuid = readUUID("D\(index)UI"), !uuid.isEmpty else { continue }
@@ -77,6 +103,27 @@ public final class SMCPowerReader {
             ))
         }
         return channels
+    }
+
+    // Reads system DC-in power from the SMC rails VD0R (volts), ID0R (amps) and
+    // PDTR (watts). Returns nil when neither the voltage nor the current rail is
+    // present, so the caller can fall back to the battery telemetry. PDTR is the
+    // firmware's own total and is preferred over volts * amps.
+    public func readSystemPowerInput() -> RawSMCSystemPower? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard openLocked() else { return nil }
+
+        let volts = readFloat("VD0R")
+        let amps = readFloat("ID0R")
+        guard volts != nil || amps != nil else { return nil }
+
+        let watts = readFloat("PDTR").map(Double.init) ?? (Double(volts ?? 0) * Double(amps ?? 0))
+        return RawSMCSystemPower(
+            volts: Double(volts ?? 0),
+            amps: Double(amps ?? 0),
+            watts: watts
+        )
     }
 
     // MARK: - Key reads

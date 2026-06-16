@@ -10,10 +10,10 @@ import WhatPortCore
 // values into. The consumer awaits values with `for await snapshot in stream`.
 //
 // Lifecycle:
-// 1. start() registers IOKit notifications and begins the 3s poll timer
+// 1. start() opens the SMC connection and begins the poll timer + notifications
 // 2. On notification (debounced): reads all state, yields a snapshot
-// 3. On poll tick (3s): reads all state, yields a snapshot
-// 4. stop() cancels everything
+// 3. On poll tick (pollInterval): reads all state, yields a snapshot
+// 4. stop() cancels everything and closes the SMC connection
 //
 // Notifications give sub-second response to plug/unplug events.
 // The poll timer catches everything else (power changes, transport
@@ -24,7 +24,16 @@ import WhatPortCore
 // own queue, and we access mutable state only from controlled contexts.
 
 public final class LivePortDataSource: @unchecked Sendable, PortDataSource {
+    // How often the poll timer reads state. Per-port power-OUT now comes from the
+    // SMC, which updates ~1 Hz, so we poll at 1s to track the live draw (the old
+    // PowerOutDetails source froze under load, making a faster poll pointless).
+    private static let pollInterval: Duration = .seconds(1)
+
     private let notifier = PortNotifier()
+    // One persisted SMC connection, opened in start() and closed in stop(),
+    // reused for every snapshot instead of re-opening per poll. Its reads are
+    // lock-guarded so the notifier callback and the poll task can share it.
+    private let smc = SMCPowerReader()
     private nonisolated(unsafe) var pollTask: Task<Void, Never>?
     private nonisolated(unsafe) var continuation: AsyncStream<PortSnapshot>.Continuation?
     private nonisolated(unsafe) var isRunning = false
@@ -45,6 +54,9 @@ public final class LivePortDataSource: @unchecked Sendable, PortDataSource {
         guard !isRunning else { return }
         isRunning = true
 
+        // Open the shared SMC connection once for the session.
+        smc.open()
+
         // Yield an initial snapshot immediately
         yieldSnapshot()
 
@@ -53,8 +65,8 @@ public final class LivePortDataSource: @unchecked Sendable, PortDataSource {
             self?.yieldSnapshot()
         }
 
-        // Start polling (3-second interval). Reads all state, not just power.
-        // Acts as a safety net alongside notifications.
+        // Start polling (pollInterval). Reads all state, not just power.
+        // Acts as a safety net alongside notifications and drives live power.
         startPollTimer()
     }
 
@@ -70,12 +82,13 @@ public final class LivePortDataSource: @unchecked Sendable, PortDataSource {
         notifier.stop()
         pollTask?.cancel()
         pollTask = nil
+        smc.close()
         continuation?.finish()
         continuation = nil
     }
 
     private func yieldSnapshot() {
-        let snapshot = SnapshotReader.takeSnapshot()
+        let snapshot = SnapshotReader.takeSnapshot(smc: smc)
         continuation?.yield(snapshot)
     }
 
@@ -83,7 +96,7 @@ public final class LivePortDataSource: @unchecked Sendable, PortDataSource {
         pollTask?.cancel()
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: Self.pollInterval)
                 guard !Task.isCancelled else { break }
                 guard let self, self.isRunning else { break }
                 self.yieldSnapshot()

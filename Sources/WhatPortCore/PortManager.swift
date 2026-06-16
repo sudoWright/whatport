@@ -20,7 +20,8 @@ public final class PortManager: @unchecked Sendable {
     // Power history for sparkline graphs (per port ID)
     public private(set) var powerHistory: [Int: [PowerSample]] = [:]
 
-    private let maxPowerSamples = 20
+    // 60 samples at the 1s poll interval = the 60s window the sparkline labels.
+    private let maxPowerSamples = 60
 
     // Port recorder: stores long-running history and events.
     // When nil, recording is disabled (no-op). Set by the Pro plugin
@@ -664,11 +665,12 @@ extension PortManager {
         stampMagSafeHPMData(&nonUSBC, hpmPorts: hpmPorts)
         results.append(contentsOf: nonUSBC)
 
-        // Desktop power-OUT: join SMC channels to ports by UUID. The SMC
-        // D-index is not the physical port number, so the channel's DxUI (=
-        // the port's HPM UUID) is the only correct join. Fills power the
-        // battery paths can't (Mac mini / Studio, or any Mac sourcing bus
-        // power), so it runs after the charger/battery power is applied.
+        // Per-port power-OUT: join SMC channels to ports by UUID. The SMC is the
+        // primary source (live ~1 Hz; PowerOutDetails freezes under load), so it
+        // overrides the PowerOutDetails reading wherever a channel resolves. It
+        // runs after the charger path so it never clobbers an incoming reading.
+        // The channel's DxUI (= the port's HPM UUID) is the only correct join;
+        // the SMC D-index is not the physical port number.
         applySMCPower(to: &results, smcPortPower: smcPortPower)
 
         // Build lookup dictionaries for enrichment data
@@ -893,11 +895,19 @@ extension PortManager {
         }
     }
 
-    // Join SMC per-port power-OUT channels to ports by UUID and fill the power
-    // of any port the battery paths didn't cover. The SMC reports power the Mac
-    // delivers OUT to bus-powered devices; on desktops (no battery) it is the
-    // only per-port power source. Matched on the channel's DxUI = the port's
-    // HPM UUID, never the SMC D-index (which is not the physical port number).
+    // Join SMC per-port power-OUT channels to ports by UUID. The SMC is the
+    // primary per-port power-OUT source: its analog rails (DxJV/DxJI) update
+    // ~1 Hz and track the real draw, whereas AppleSmartBattery.PowerOutDetails
+    // is firmware-batched and freezes under load on Apple Silicon (confirmed in
+    // WhatCable, M5 Pro: held 6098 mW for 20 s while the SMC tracked 6.6-7.5 W).
+    // So where a channel resolves to a port by UUID we override the
+    // PowerOutDetails reading with the live SMC values, but carry over the
+    // PD-contract metadata (configured voltage/current, VConn) the SMC doesn't
+    // provide. We never override an incoming (charger) reading: the SMC measures
+    // power OUT, and the charger path applied earlier owns charging ports.
+    // Matched on the channel's DxUI = the port's HPM UUID, never the SMC D-index
+    // (which is not the physical port number). On M1/M2 (no UUID map) or any
+    // unresolved port, no channel matches and the PowerOutDetails reading stands.
     private func applySMCPower(to results: inout [PortState], smcPortPower: [SMCPortPowerInput]) {
         guard !smcPortPower.isEmpty else { return }
 
@@ -908,20 +918,25 @@ extension PortManager {
         )
 
         for i in results.indices {
-            guard results[i].power == nil, let uuid = results[i].uuid else { continue }
+            guard let uuid = results[i].uuid else { continue }
+            // Keep incoming (charger) readings: the SMC only measures power OUT.
+            if let existing = results[i].power, existing.direction == .incoming { continue }
             guard let channel = byUUID[normalisedUUID(uuid)] else { continue }
             // Only surface a reading when the Mac is actually sourcing power.
-            // A channel at 0 W means nothing is drawing; leave power nil so the
-            // UI shows "not sourcing" rather than a misleading 0.0 W.
+            // A channel at 0 W means nothing is drawing; leave the existing
+            // reading (or nil) so the UI shows the real state, not a stale 0 W.
             guard channel.watts > 0 else { continue }
 
+            // Carry the PD contract over from the PowerOutDetails reading when we
+            // have one; the SMC doesn't report it and it isn't frozen-sensitive.
+            let existing = results[i].power
             results[i].power = PortPower(
                 watts: channel.watts,
                 current: Int((channel.amps * 1000).rounded()),
                 voltage: Int((channel.volts * 1000).rounded()),
-                configuredVoltage: 0,
-                configuredCurrent: 0,
-                vconnCurrent: 0,
+                configuredVoltage: existing?.configuredVoltage ?? 0,
+                configuredCurrent: existing?.configuredCurrent ?? 0,
+                vconnCurrent: existing?.vconnCurrent ?? 0,
                 direction: .outgoing
             )
         }

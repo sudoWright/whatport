@@ -347,10 +347,15 @@ struct PortDetailView: View {
                         .foregroundStyle(.secondary)
                 }
                 HStack(spacing: 12) {
-                    LabeledValue(
-                        label: "Contract",
-                        value: "\(formatVolts(power.configuredVoltage)) / \(formatAmps(power.configuredCurrent))"
-                    )
+                    // The PD contract comes from PowerOutDetails. SMC-only ports
+                    // (no battery controller) report it as 0, so hide the row
+                    // rather than show a misleading "0 V / 0 mA".
+                    if power.configuredVoltage > 0 || power.configuredCurrent > 0 {
+                        LabeledValue(
+                            label: "Contract",
+                            value: "\(formatVolts(power.configuredVoltage)) / \(formatAmps(power.configuredCurrent))"
+                        )
+                    }
                     if power.vconnCurrent > 0 {
                         LabeledValue(
                             label: "VConn",
