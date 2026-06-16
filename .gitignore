@@ -8,3 +8,4 @@ DerivedData/
 .claude/
 default.profraw
 .env
+dist-debug/
