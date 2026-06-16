@@ -1085,7 +1085,7 @@
           buyButton.textContent = 'Starting checkout...';
           if (errorSlot) { errorSlot.hidden = true; errorSlot.textContent = ''; }
           try {
-            var res = await fetch('https://whatport.uk/api/checkout', { method: 'POST' });
+            var res = await fetch('https://whatport.app/api/checkout', { method: 'POST' });
             var data = await res.json();
             if (res.ok && data.url) {
               window.location.href = data.url;

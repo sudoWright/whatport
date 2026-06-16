@@ -215,7 +215,7 @@
           </a>
         </div>
 
-        <p class="support-note">Questions? Email <a href="mailto:support@whatport.uk">support@whatport.uk</a></p>
+        <p class="support-note">Questions? Email <a href="mailto:support@whatport.app">support@whatport.app</a></p>
       </div>
     </div>
 
@@ -255,7 +255,7 @@
           contentArea.innerHTML =
             '<h1>Thanks for buying WhatPort Pro.</h1>' +
             '<p>Payment received. Your licence key is being generated and will arrive by email shortly.</p>' +
-            '<p>If it does not arrive within 10 minutes, contact <a href="mailto:support@whatport.uk" style="color:var(--accent)">support@whatport.uk</a>.</p>';
+            '<p>If it does not arrive within 10 minutes, contact <a href="mailto:support@whatport.app" style="color:var(--accent)">support@whatport.app</a>.</p>';
           showActions();
         }
 
@@ -301,7 +301,7 @@
 
         function poll() {
           attempts++;
-          fetch('https://whatport.uk/api/session-status', {
+          fetch('https://whatport.app/api/session-status', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionId: sessionId })
