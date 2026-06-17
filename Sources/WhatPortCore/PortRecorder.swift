@@ -3,9 +3,10 @@ import Foundation
 // Protocol for the port recording engine.
 //
 // PortManager calls recordSnapshot() on every poll cycle. The concrete
-// FlightRecorder implementation lives in WhatPortPlugins (Pro code).
-// When no plugin registers a recorder, PortManager.recorder stays nil
-// and the optional-chain call is a no-op.
+// FlightRecorder implementation lives in WhatPortCore (FlightRecorder.swift,
+// excluded from the OSS mirror) and is wired up by the Pro plugin in
+// WhatPortPlugins. When no plugin registers a recorder, PortManager.recorder
+// stays nil and the optional-chain call is a no-op.
 //
 // This protocol lives in WhatPortCore so neither PortManager nor the
 // host app need to import the Pro module directly.

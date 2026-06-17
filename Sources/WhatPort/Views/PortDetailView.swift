@@ -265,6 +265,10 @@ struct PortDetailView: View {
     }
 
     private func statsLine(_ stats: PortStatistics) -> some View {
+        // Raw, unadjusted lifetime counters from the USB host controller. These can
+        // differ from the health badge above: the badge reads the HPM overcurrent
+        // counter and is adjusted by any acknowledgement, whereas this line is the
+        // factual all-time total and is shown as-is.
         let errorCount = stats.overcurrentCount + stats.linkErrorCount
             + stats.enumerationFailureCount + stats.addressFailureCount
 
@@ -316,9 +320,10 @@ struct PortDetailView: View {
         // Frequency-aware, matching the Flight Recorder health philosophy: a lone
         // or occasional overcurrent is usually a transient (most often a cable or
         // device, not the port), so it reads as a calm amber note rather than a red
-        // alarm. Red is reserved for frequent faults (>=5, the same threshold the
-        // Flight Recorder uses) that more plausibly point to a real problem. This
-        // avoids pushing anyone toward an unnecessary repair over a single counter.
+        // alarm. Red is reserved for frequent faults (>=5; chosen for this badge,
+        // the Flight Recorder card uses a separate weighted score) that more
+        // plausibly point to a real problem. This avoids pushing anyone toward an
+        // unnecessary repair over a single counter.
         let (fill, textColor, label): (Color, Color, String) = {
             // Subtract any acknowledged baseline. If the live counter is below it,
             // the controller's counter was reset and the baseline is stale, so show
