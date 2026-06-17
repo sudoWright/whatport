@@ -6,17 +6,17 @@
 
 A lightweight macOS menu bar utility that shows real-time USB-C and Thunderbolt port status. See what's connected, how fast it's running, and how much power each port is using.
 
-Apple Silicon only (M1 and later).
+Free and open source. Apple Silicon only (M1 and later).
 
 <p align="center">
   <img src="screenshots/port-list.webp" width="280" alt="WhatPort port list showing connected devices">
-  <img src="screenshots/detail-thunderbolt.webp" width="280" alt="Thunderbolt display detail with lane status">
-  <img src="screenshots/detail-usb-power.webp" width="280" alt="USB device detail with power monitoring">
+  <img src="screenshots/detail-displayport.png" width="280" alt="Port detail showing DisplayPort alt-mode lanes and link speeds">
+  <img src="screenshots/detail-power.png" width="280" alt="Port detail showing power delivery and a rolling power graph">
 </p>
 
 ## Features
 
-- **Port overview** at a glance from the menu bar, with active count and total power draw
+- **Port overview** at a glance from the menu bar, with active count and power in/out
 - **Protocol detection** for Thunderbolt 3/4/5, DisplayPort alt-mode, USB3, and USB2
 - **Live lane status** showing exactly which lanes are carrying data and at what speed
 - **Power monitoring** with real-time wattage, voltage, current, and a 60-second rolling graph
@@ -27,9 +27,39 @@ Apple Silicon only (M1 and later).
 - **Port statistics** with lifetime connection counts and error tracking
 - **MagSafe support** with charging status and power draw
 
+## WhatPort Pro: the Flight Recorder
+
+The live view tells you what your ports are doing right now. The **Flight Recorder** keeps watching when you're not, so you can catch the intermittent faults that only show up when nobody's looking. It runs always-on in the background, records each port's power, protocol, and link state to a local database, and survives restarts.
+
+<p align="center">
+  <img src="screenshots/flight-recorder-timeline.png" width="420" alt="Flight Recorder timeline of plug, unplug, and power events">
+  <img src="screenshots/flight-recorder-graphs.png" width="420" alt="Flight Recorder power graphs for every port over time">
+</p>
+<p align="center">
+  <img src="screenshots/flight-recorder-health.png" width="420" alt="Flight Recorder port health scores">
+  <img src="screenshots/flight-recorder-alerts.png" width="420" alt="Flight Recorder alert rules for overcurrent, link errors, and disconnects">
+</p>
+
+- **Event timeline.** Every plug, unplug, protocol change, and power event over time, filterable by port and event kind.
+- **Power graphs.** Power draw for every port across a selectable time range, with disk-backed history so it survives a restart.
+- **Port health scoring.** Each port scored by how often faults recur, with a clear "not a hardware diagnosis" note. Reset the baseline once you've dealt with something.
+- **Alerts.** Get notified on overcurrent, link error, disconnect, or protocol downgrade.
+- **Sessions.** Bookmark a stretch of recording, name it, and export it to JSON or CSV.
+- **Survives an overnight kill.** With Launch at Login on, it restarts itself within seconds if macOS stops it to free memory. A deliberate Quit still quits.
+
+**£9.99 one-time, works on up to 2 Macs.** Secure checkout via Stripe; your licence key is emailed instantly. [Buy WhatPort Pro at whatport.app](https://www.whatport.app/#pro).
+
+The base app in this repository is the free, open-source half. The Flight Recorder is the paid part and is not included in the open-source build.
+
 ## Install
 
-Download the latest release from the [releases page](https://github.com/darrylmorley/whatport/releases), unzip, and drag `WhatPort.app` to your Applications folder. The app is signed and notarized by Apple.
+Download the latest release from the [releases page](https://github.com/darrylmorley/whatport/releases), unzip, and drag `WhatPort.app` to your Applications folder. Or with [Homebrew](https://brew.sh):
+
+```bash
+brew install --cask darrylmorley/whatport/whatport
+```
+
+The app is signed and notarized by Apple.
 
 ## Requirements
 
@@ -55,6 +85,8 @@ WhatPort reads real-time data from three IOKit service layers:
 3. **AppleSmartBattery** for power delivery data (watts, voltage, current per port)
 
 Connection events are detected via IOKit interest notifications on `IOPortTransportStateCC` services for sub-second response. All state (connections, power, transports) is also polled every 3 seconds as a safety net.
+
+No analytics, no telemetry, no network requests. The app reads local IOKit data and nothing else.
 
 ## Architecture
 
