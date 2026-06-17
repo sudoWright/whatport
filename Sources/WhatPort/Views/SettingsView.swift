@@ -22,9 +22,10 @@ struct SettingsView: View {
                             setLaunchAtLogin(newValue)
                         }
 
-                    Text("Keeps recording running and restarts WhatPort if macOS stops it to free memory.")
+                    Text("Keeps recording running, and restarts WhatPort if it's stopped unexpectedly (for example, when macOS quits it to free memory). A normal Quit still quits. Turn this off to stop it relaunching.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.horizontal, 16)
