@@ -35,6 +35,11 @@ app: build
 	/usr/libexec/PlistBuddy \
 		-c "Add :com.apple.security.network.client bool true" \
 		$(APP)/Contents/entitlements.plist
+	@# Keep-alive LaunchAgent (registered via SMAppService.agent). Real agent
+	@# registration needs a properly signed app in /Applications; this dev bundle
+	@# just keeps the layout in parity so the plist is always present.
+	@mkdir -p $(APP)/Contents/Library/LaunchAgents
+	@cp LaunchAgents/app.whatport.whatport.agent.plist $(APP)/Contents/Library/LaunchAgents/
 	@echo "Built $(APP)"
 
 run: app

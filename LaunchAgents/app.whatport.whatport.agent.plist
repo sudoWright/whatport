@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>app.whatport.whatport.agent</string>
+    <!-- Path relative to the app bundle, so the agent launches the same
+         executable that provides the menu-bar UI: one process, not a helper. -->
+    <key>BundleProgram</key>
+    <string>Contents/MacOS/WhatPort</string>
+    <!-- Start at login. -->
+    <key>RunAtLoad</key>
+    <true/>
+    <!-- Relaunch only after an abnormal exit (a system memory-pressure kill is an
+         unsuccessful exit). A deliberate user Quit exits cleanly (status 0), so
+         launchd does NOT relaunch it. launchd throttles relaunch to a ~10s floor. -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <!-- Surfaces the item in System Settings > General > Login Items under the
+         app's name, so the user can see and toggle it. -->
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>app.whatport.whatport</string>
+    </array>
+</dict>
+</plist>

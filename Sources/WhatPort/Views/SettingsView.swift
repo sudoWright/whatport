@@ -1,13 +1,11 @@
 import SwiftUI
-import ServiceManagement
 import WhatPortAppKit
 
 struct SettingsView: View {
-    // SMAppService.mainApp manages the "Launch at Login" state.
-    // It uses the modern ServiceManagement framework (macOS 13+),
-    // which is the Apple-recommended replacement for the older
-    // SMLoginItemSetEnabled API. No helper app bundle needed.
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    // Launch-at-Login is a keep-alive LaunchAgent (see LaunchAtLogin): it starts
+    // WhatPort at login and relaunches it if macOS stops it to free memory, while
+    // still honouring a clean Quit.
+    @State private var launchAtLogin = LaunchAtLogin.isEnabled
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -16,12 +14,18 @@ struct SettingsView: View {
                 Text("Settings")
                     .font(.title3.weight(.semibold))
 
-                Toggle("Launch at Login", isOn: $launchAtLogin)
-                    .toggleStyle(.switch)
-                    .font(.body)
-                    .onChange(of: launchAtLogin) { _, newValue in
-                        setLaunchAtLogin(newValue)
-                    }
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("Launch at Login", isOn: $launchAtLogin)
+                        .toggleStyle(.switch)
+                        .font(.body)
+                        .onChange(of: launchAtLogin) { _, newValue in
+                            setLaunchAtLogin(newValue)
+                        }
+
+                    Text("Keeps recording running and restarts WhatPort if macOS stops it to free memory.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
@@ -56,15 +60,10 @@ struct SettingsView: View {
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
-        do {
-            if enabled {
-                try SMAppService.mainApp.register()
-            } else {
-                try SMAppService.mainApp.unregister()
-            }
-        } catch {
-            // Reset toggle if the operation failed
-            launchAtLogin = SMAppService.mainApp.status == .enabled
+        // Resync the toggle to the real state if register/unregister failed, so it
+        // never shows a value that didn't take.
+        if !LaunchAtLogin.setEnabled(enabled) {
+            launchAtLogin = LaunchAtLogin.isEnabled
         }
     }
 }

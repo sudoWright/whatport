@@ -23,6 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         isSupported = HardwareCheck.isAppleSilicon()
 
+        // Move any existing login-item users onto the keep-alive agent so the
+        // overnight-survival behaviour applies without them re-toggling.
+        LaunchAtLogin.migrateFromMainAppIfNeeded()
+
         // Register Pro plugins (no-op in the OSS build)
         bootstrapPlugins(registry: .shared)
 
