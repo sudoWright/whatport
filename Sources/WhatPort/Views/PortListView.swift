@@ -220,7 +220,8 @@ struct PortListView: View {
                 powerHistory: portManager.powerHistory[port.id] ?? [],
                 powerMeteringAvailable: portManager.powerMeteringAvailable,
                 isCharging: portManager.isCharging,
-                fullyCharged: portManager.fullyCharged
+                fullyCharged: portManager.fullyCharged,
+                acknowledged: portManager.recorder?.acknowledgedCounters(forPort: port.id)
             )
         }
         .frame(height: 560)

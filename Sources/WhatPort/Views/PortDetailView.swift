@@ -8,6 +8,9 @@ struct PortDetailView: View {
     let powerMeteringAvailable: Bool
     var isCharging: Bool = false
     var fullyCharged: Bool = false
+    // Lifetime counts the user has acknowledged (Pro "Reset Health Counters"),
+    // subtracted from the health badge so it agrees with the Flight Recorder.
+    var acknowledged: AcknowledgedCounters? = nil
 
     var body: some View {
         ScrollView {
@@ -317,8 +320,16 @@ struct PortDetailView: View {
         // Flight Recorder uses) that more plausibly point to a real problem. This
         // avoids pushing anyone toward an unnecessary repair over a single counter.
         let (fill, textColor, label): (Color, Color, String) = {
-            let overcurrents = health.overcurrentCount
-            let ldcmError = !health.ldcmStatus.isEmpty && health.ldcmStatus != "No Error"
+            // Subtract any acknowledged baseline. If the live counter is below it,
+            // the controller's counter was reset and the baseline is stale, so show
+            // the full count rather than hiding new faults.
+            let ackOvercurrents = acknowledged?.overcurrentCount ?? 0
+            let overcurrents = health.overcurrentCount < ackOvercurrents
+                ? health.overcurrentCount
+                : health.overcurrentCount - ackOvercurrents
+            let ldcmError = !health.ldcmStatus.isEmpty
+                && health.ldcmStatus != "No Error"
+                && health.ldcmStatus != acknowledged?.ldcmStatus
 
             if ldcmError {
                 return (.orange, .orange, health.ldcmStatus)
