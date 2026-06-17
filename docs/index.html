@@ -30,11 +30,21 @@
       "name": "WhatPort",
       "operatingSystem": "macOS 14+",
       "applicationCategory": "UtilitiesApplication",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "GBP"
-      },
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "WhatPort",
+          "price": "0",
+          "priceCurrency": "GBP"
+        },
+        {
+          "@type": "Offer",
+          "name": "WhatPort Pro: Flight Recorder",
+          "price": "9.99",
+          "priceCurrency": "GBP",
+          "url": "https://www.whatport.app/#pro"
+        }
+      ],
       "description": "Real-time USB-C port monitoring for Mac. See protocol, speed, lane status, and power for every port.",
       "url": "https://www.whatport.app",
       "downloadUrl": "https://github.com/darrylmorley/whatport/releases/latest",
@@ -684,11 +694,20 @@
         color: var(--good);
       }
 
+      .buy-reassure {
+        color: var(--ink-soft);
+        font-size: 13px;
+        text-align: center;
+        margin-top: 12px;
+        margin-bottom: 0;
+      }
+      .buy-reassure strong { color: var(--good); }
+
       .buy-stripe-note {
         color: var(--muted);
         font-size: 13px;
         text-align: center;
-        margin-top: 10px;
+        margin-top: 8px;
         margin-bottom: 0;
       }
 
@@ -987,8 +1006,8 @@
             <figcaption>Thunderbolt display</figcaption>
           </figure>
           <figure>
-            <img src="screenshot-detail-usb.webp" alt="USB device detail with lane status and cable info" width="300">
-            <figcaption>USB device with power graph</figcaption>
+            <img src="screenshot-detail-usb.webp" alt="USB device detail showing live lanes, cable info, and a 60-second power graph" width="300">
+            <figcaption>USB device detail</figcaption>
           </figure>
           <figure>
             <img src="screenshot-list.webp" alt="Port list overview" width="300">
@@ -1031,7 +1050,7 @@
 
         <div class="pro-card-wrap">
           <div class="pricing-card">
-            <span class="card-label">WhatPort Pro</span>
+            <span class="card-label">One-time purchase</span>
             <p class="card-title">Flight Recorder</p>
             <span class="price">£9.99</span>
             <span class="price-period">one-time &nbsp;&middot;&nbsp; works on 2 Macs</span>
@@ -1065,6 +1084,7 @@
               Buy WhatPort Pro
               <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
             </button>
+            <p class="buy-reassure"><strong>14-day money-back guarantee, no questions asked.</strong> Apple Silicon only (M1 and later).</p>
             <p class="buy-stripe-note">Secure checkout via Stripe. Your licence key is emailed instantly.</p>
             <p class="buy-error" id="buy-error" role="alert" hidden></p>
           </div>
@@ -1126,6 +1146,10 @@
           <div class="faq-item">
             <h3>Does it phone home?</h3>
             <p>No. There are no analytics, no telemetry, and no network requests. The app reads local IOKit data and nothing else. The source is on GitHub if you want to verify.</p>
+          </div>
+          <div class="faq-item">
+            <h3>How does the two-Mac licence work?</h3>
+            <p>One key activates Pro on up to two Macs, so your laptop and your desktop are both covered. Paste the same key into the app on each machine under Flight Recorder. Replacing a Mac? Email support and we'll free up a slot.</p>
           </div>
           <div class="faq-item">
             <h3>How is this different from WhatCable?</h3>
@@ -1199,13 +1223,11 @@
 
     <footer>
       <div class="wrap">
-        <span>Built by <a href="https://github.com/darrylmorley">Darryl Morley</a>. MIT licensed.</span>
+        <span>Built by <a href="https://github.com/darrylmorley">Darryl Morley</a>, maker of <a href="https://www.whatcable.uk">WhatCable</a>. MIT licensed.</span>
         <span>
           <a href="https://github.com/darrylmorley/whatport">Source</a>
           &nbsp;&middot;&nbsp;
           <a href="https://github.com/darrylmorley/whatport/releases">Releases</a>
-          &nbsp;&middot;&nbsp;
-          <a href="https://www.whatcable.uk">WhatCable</a>
         </span>
       </div>
     </footer>
