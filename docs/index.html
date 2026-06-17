@@ -170,6 +170,13 @@
       }
       .button.secondary:hover { border-color: #c8d0db; }
 
+      .button.buy {
+        background: var(--accent);
+        color: #fff;
+      }
+      .button.buy:hover { background: var(--accent-strong); }
+      .button.buy:disabled { opacity: 0.65; cursor: default; }
+
       .button .arrow { transition: transform 0.15s ease; }
       .button:hover .arrow { transform: translateX(2px); }
 
@@ -744,6 +751,7 @@
 
       .fr-grid img {
         width: 100%;
+        height: auto;
         border-radius: 12px;
         border: 1px solid var(--line);
         box-shadow: var(--shadow-md);
@@ -800,10 +808,13 @@
               Download for macOS
               <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
             </a>
-            <a class="button secondary" href="https://github.com/darrylmorley/whatport">View source</a>
+            <button class="button buy" id="buy-pro-hero" type="button">
+              Buy Pro &middot; £9.99
+              <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </button>
           </div>
           <p class="hero-pro-line">
-            Or keep watching when you're away with the <a href="#pro">Flight Recorder (Pro)<svg style="display:inline;vertical-align:middle;margin-left:3px;" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></a>
+            The app is free and open source. Pro adds the <a href="#pro">Flight Recorder</a> &middot; <a href="https://github.com/darrylmorley/whatport">View source</a>
           </p>
           <div class="meta-row">
             <span>
@@ -1196,29 +1207,34 @@
     </footer>
     <script>
       (function () {
-        var buyButton = document.getElementById('buy-pro');
         var errorSlot = document.getElementById('buy-error');
-        if (!buyButton) return;
-        var originalHTML = buyButton.innerHTML;
-        buyButton.addEventListener('click', async function () {
-          buyButton.disabled = true;
-          buyButton.textContent = 'Starting checkout...';
-          if (errorSlot) { errorSlot.hidden = true; errorSlot.textContent = ''; }
-          try {
-            var res = await fetch('https://www.whatport.app/api/checkout', { method: 'POST' });
-            var data = await res.json();
-            if (res.ok && data.url) {
-              window.location.href = data.url;
-            } else {
-              throw new Error(data.error || 'Could not start checkout. Please try again.');
+
+        function wireBuyButton(button) {
+          if (!button) return;
+          var originalHTML = button.innerHTML;
+          button.addEventListener('click', async function () {
+            button.disabled = true;
+            button.textContent = 'Starting checkout...';
+            if (errorSlot) { errorSlot.hidden = true; errorSlot.textContent = ''; }
+            try {
+              var res = await fetch('https://www.whatport.app/api/checkout', { method: 'POST' });
+              var data = await res.json();
+              if (res.ok && data.url) {
+                window.location.href = data.url;
+              } else {
+                throw new Error(data.error || 'Could not start checkout. Please try again.');
+              }
+            } catch (err) {
+              var msg = err.message || 'Could not start checkout. Please try again.';
+              if (errorSlot) { errorSlot.textContent = msg; errorSlot.hidden = false; }
+              button.disabled = false;
+              button.innerHTML = originalHTML;
             }
-          } catch (err) {
-            var msg = err.message || 'Could not start checkout. Please try again.';
-            if (errorSlot) { errorSlot.textContent = msg; errorSlot.hidden = false; }
-            buyButton.disabled = false;
-            buyButton.innerHTML = originalHTML;
-          }
-        });
+          });
+        }
+
+        wireBuyButton(document.getElementById('buy-pro'));
+        wireBuyButton(document.getElementById('buy-pro-hero'));
       })();
     </script>
   </body>
