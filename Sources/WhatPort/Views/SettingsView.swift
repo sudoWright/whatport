@@ -33,7 +33,7 @@ struct SettingsView: View {
 
             Spacer()
 
-            // Plugin settings sections (license status, dev override, etc.)
+            // Plugin settings sections (license status, Flight Recorder data, etc.)
             ForEach(
                 Array(PluginRegistry.shared.settingsSections.enumerated()),
                 id: \.offset
