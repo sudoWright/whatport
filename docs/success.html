@@ -107,6 +107,10 @@
         margin-bottom: 12px;
       }
 
+      /* The author display rule above beats the [hidden] UA style, so the
+         spinner wouldn't hide on its own. Make hidden actually hide it. */
+      .spinner[hidden] { display: none; }
+
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
