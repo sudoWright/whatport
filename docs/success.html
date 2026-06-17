@@ -301,7 +301,7 @@
 
         function poll() {
           attempts++;
-          fetch('https://whatport.app/api/session-status', {
+          fetch('https://www.whatport.app/api/session-status', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionId: sessionId })
