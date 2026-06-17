@@ -38,7 +38,7 @@
       "description": "Real-time USB-C port monitoring for Mac. See protocol, speed, lane status, and power for every port.",
       "url": "https://www.whatport.app",
       "downloadUrl": "https://github.com/darrylmorley/whatport/releases/latest",
-      "softwareVersion": "1.1.0",
+      "softwareVersion": "1.1.2",
       "author": {
         "@type": "Person",
         "name": "Darryl Morley",
@@ -582,6 +582,7 @@
         .how-grid { grid-template-columns: 1fr; }
         .install-grid { grid-template-columns: 1fr; gap: 32px; }
         .screenshot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+        .problem-grid { grid-template-columns: 1fr; }
       }
 
       @media (max-width: 560px) {
@@ -592,6 +593,8 @@
         .protocol-grid { grid-template-columns: 1fr; }
         .screenshot-grid { grid-template-columns: 1fr; }
         .screenshot-grid img { max-width: 260px; }
+        .fr-grid { grid-template-columns: 1fr; }
+        .problem-card { padding: 20px; }
         .actions { width: 100%; flex-direction: column; }
         .actions .button { width: 100%; }
         .hero-shot img { max-width: 100%; }
@@ -695,6 +698,71 @@
         text-align: center;
         margin-top: 20px;
       }
+
+      /* Problem */
+      .problem { border-bottom: 1px solid var(--line); }
+
+      .problem-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 24px;
+      }
+
+      .problem-card {
+        padding: 28px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .problem-card .label {
+        display: inline-block;
+        margin-bottom: 12px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+
+      .problem-card .label.speed { background: #cce5ff; color: #004085; }
+      .problem-card .label.power { background: #fef3cd; color: #856404; }
+      .problem-card .label.display { background: #ffe0cc; color: #9a3412; }
+
+      .problem-card .ask { font-size: 19px; font-weight: 700; margin-bottom: 8px; }
+      .problem-card p { color: var(--ink-soft); font-size: 14.5px; line-height: 1.55; }
+
+      /* Flight Recorder showcase */
+      .fr-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 28px;
+        margin-bottom: 44px;
+      }
+
+      .fr-grid figure { margin: 0; }
+
+      .fr-grid img {
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow-md);
+      }
+
+      .fr-grid figcaption {
+        margin-top: 12px;
+        font-size: 14px;
+        color: var(--muted);
+        font-weight: 500;
+        text-align: center;
+      }
+
+      .hero-pro-line {
+        font-size: 14px;
+        color: var(--ink-soft);
+        margin-bottom: 24px;
+      }
+      .hero-pro-line a { color: var(--accent); font-weight: 500; }
     </style>
   </head>
   <body>
@@ -734,6 +802,9 @@
             </a>
             <a class="button secondary" href="https://github.com/darrylmorley/whatport">View source</a>
           </div>
+          <p class="hero-pro-line">
+            Or keep watching when you're away with the <a href="#pro">Flight Recorder (Pro)<svg style="display:inline;vertical-align:middle;margin-left:3px;" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></a>
+          </p>
           <div class="meta-row">
             <span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
@@ -754,6 +825,33 @@
         </div>
       </div>
     </header>
+
+    <section class="problem">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="section-tag">The problem</span>
+          <h2>Every USB-C port looks the same. They are not.</h2>
+          <p>The ports on your Mac are identical holes. One might be Thunderbolt 5, the next plain USB. macOS won't tell you which is which, why a charger crawls, or whether your display is running at full resolution. WhatPort does.</p>
+        </div>
+        <div class="problem-grid">
+          <div class="problem-card">
+            <span class="label speed">Which port is fastest?</span>
+            <div class="ask">Thunderbolt or just USB?</div>
+            <p>TB5, TB4, and USB-C ports look identical. Plug your fast SSD into the wrong one and it crawls, with nothing on screen to tell you why.</p>
+          </div>
+          <div class="problem-card">
+            <span class="label power">Why is charging slow?</span>
+            <div class="ask">15W when you expected 96W?</div>
+            <p>A port might be negotiating a fraction of the power you think. WhatPort shows the live watts, voltage, and current, so you can see the limit.</p>
+          </div>
+          <div class="problem-card">
+            <span class="label display">Is my display at full res?</span>
+            <div class="ask">Fewer lanes than you paid for?</div>
+            <p>DisplayPort alt-mode can quietly run at reduced lanes or link rate. WhatPort shows the lanes in use and the negotiated speed per lane.</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <section class="protocol">
       <div class="wrap">
@@ -893,12 +991,31 @@
       <div class="wrap">
         <div class="section-head">
           <span class="section-tag">WhatPort Pro</span>
-          <h2>Go beyond the live view.</h2>
+          <h2>The Flight Recorder keeps watching when you're not.</h2>
           <p>
-            The base app is free and open source. WhatPort Pro adds the Flight Recorder,
-            which tracks port activity over time so you can spot patterns, catch issues early,
-            and export your session data.
+            The live view tells you what your ports are doing right now. The Flight Recorder
+            runs always-on in the background and records it, so you can catch the intermittent
+            faults that only show up when nobody's looking. It survives restarts and stays light on memory.
           </p>
+        </div>
+
+        <div class="fr-grid">
+          <figure>
+            <img src="flight-recorder-timeline.webp" alt="Flight Recorder timeline listing plug, unplug, and power events with timestamps" width="812" height="644" loading="lazy">
+            <figcaption>Event timeline: every plug, unplug, and power change</figcaption>
+          </figure>
+          <figure>
+            <img src="flight-recorder-graphs.webp" alt="Flight Recorder power graph for every port over a selectable time range" width="812" height="644" loading="lazy">
+            <figcaption>Power graphs over time, per port</figcaption>
+          </figure>
+          <figure>
+            <img src="flight-recorder-health.webp" alt="Flight Recorder port health scores with uptime, connection, and error counts" width="812" height="644" loading="lazy">
+            <figcaption>Port health scoring</figcaption>
+          </figure>
+          <figure>
+            <img src="flight-recorder-alerts.webp" alt="Flight Recorder alert rules for overcurrent, link errors, disconnects, and protocol downgrades" width="939" height="644" loading="lazy">
+            <figcaption>Alerts on overcurrent, link errors, and more</figcaption>
+          </figure>
         </div>
 
         <div class="pro-card-wrap">
@@ -908,6 +1025,10 @@
             <span class="price">£9.99</span>
             <span class="price-period">one-time &nbsp;&middot;&nbsp; works on 2 Macs</span>
             <ul class="pro-checklist">
+              <li>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+                Always-on recording that survives restarts and overnight kills
+              </li>
               <li>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
                 Event timeline: see every plug, unplug, and power event over time
