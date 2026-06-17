@@ -310,18 +310,26 @@ struct PortDetailView: View {
 
     @ViewBuilder
     private func healthBadge(_ health: PortHealth) -> some View {
+        // Frequency-aware, matching the Flight Recorder health philosophy: a lone
+        // or occasional overcurrent is usually a transient (most often a cable or
+        // device, not the port), so it reads as a calm amber note rather than a red
+        // alarm. Red is reserved for frequent faults (>=5, the same threshold the
+        // Flight Recorder uses) that more plausibly point to a real problem. This
+        // avoids pushing anyone toward an unnecessary repair over a single counter.
         let (fill, textColor, label): (Color, Color, String) = {
-            switch health.severity {
-            case .ok:
-                return (.green, .green, "OK")
-            case .warning:
-                let text = health.ldcmStatus.isEmpty ? "Warning" : health.ldcmStatus
-                return (.orange, .orange, text)
-            case .serious:
-                let n = health.overcurrentCount
-                let text = "Overcurrent: \(n) event\(n > 1 ? "s" : "")"
-                return (.red, .red, text)
+            let overcurrents = health.overcurrentCount
+            let ldcmError = !health.ldcmStatus.isEmpty && health.ldcmStatus != "No Error"
+
+            if ldcmError {
+                return (.orange, .orange, health.ldcmStatus)
             }
+            if overcurrents >= 5 {
+                return (.red, .red, "Overcurrent \u{00D7}\(overcurrents)")
+            }
+            if overcurrents > 0 {
+                return (.orange, .orange, "Overcurrent \u{00D7}\(overcurrents)")
+            }
+            return (.green, .green, "OK")
         }()
 
         Text(label)
