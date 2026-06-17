@@ -932,7 +932,7 @@
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
             </div>
             <h3>Power monitoring</h3>
-            <p>Real-time wattage, voltage, and current for every port. A rolling 60-second graph shows power draw over time.</p>
+            <p>Real-time power in and out for every port, with wattage, voltage, and current. A rolling 60-second graph shows draw over time.</p>
           </article>
 
           <article class="feature">
@@ -1077,9 +1077,9 @@
       <div class="wrap">
         <div class="section-head">
           <span class="section-tag">How it works</span>
-          <h2>Three IOKit data sources, one clear picture.</h2>
+          <h2>Unprivileged IOKit reads, one clear picture.</h2>
           <p>
-            WhatPort reads unprivileged IOKit services. No root access, no entitlements, no background daemon.
+            WhatPort correlates several IOKit and SMC services per physical port. Everything is read unprivileged: no root access, no entitlements, no background daemon. State updates the moment a device connects or disconnects, and is polled every second as a safety net.
           </p>
         </div>
 
@@ -1096,8 +1096,8 @@
           </div>
           <div class="how-card">
             <div class="step">3</div>
-            <h3>AppleSmartBattery</h3>
-            <p>Reads power delivery data per port: watts, voltage, current, and PD contract details. All state polled every 3 seconds.</p>
+            <h3>SMC + USB-PD</h3>
+            <p>Per-port power, split into power in (charging) and power out (to your devices): watts, voltage, current, and the negotiated USB-PD contract.</p>
           </div>
         </div>
       </div>
@@ -1114,6 +1114,10 @@
           <div class="faq-item">
             <h3>Does it work on Intel Macs?</h3>
             <p>No. WhatPort reads data from Apple Silicon-specific IOKit services (AppleTypeCPhy, IOPortTransportStateCC) that don't exist on Intel Macs. You need an M1 or later.</p>
+          </div>
+          <div class="faq-item">
+            <h3>Does it work on desktop Macs?</h3>
+            <p>Yes. On Macs without a battery (Mac mini, Mac Studio, Mac Pro), WhatPort reads per-port power from the SMC, so power, protocol, and lane data all work the same as on a laptop.</p>
           </div>
           <div class="faq-item">
             <h3>Does it need root or special permissions?</h3>

@@ -78,13 +78,13 @@ The built binary will be in `DerivedData`. No entitlements or root access needed
 
 ## How it works
 
-WhatPort reads real-time data from three IOKit service layers:
+WhatPort correlates several unprivileged IOKit and SMC services per physical port. The main ones:
 
 1. **AppleTypeCPhy** for USB-C lane state (transport protocol, power level per lane)
 2. **IOThunderboltPort** for Thunderbolt link speed, width, and capability
-3. **AppleSmartBattery** for power delivery data (watts, voltage, current per port)
+3. **SMC and USB-PD** for power, split into power in and power out (watts, voltage, current per port)
 
-Connection events are detected via IOKit interest notifications on `IOPortTransportStateCC` services for sub-second response. All state (connections, power, transports) is also polled every 3 seconds as a safety net.
+Connection events are detected via IOKit interest notifications for sub-second response. All state (connections, power, transports) is also polled every second as a safety net.
 
 No analytics, no telemetry, no network requests. The app reads local IOKit data and nothing else.
 
