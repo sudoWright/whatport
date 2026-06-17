@@ -21,7 +21,7 @@ app: build
 	/usr/libexec/PlistBuddy \
 		-c "Add :CFBundleName string WhatPort" \
 		-c "Add :CFBundleDisplayName string WhatPort" \
-		-c "Add :CFBundleIdentifier string uk.whatport.whatport" \
+		-c "Add :CFBundleIdentifier string app.whatport.whatport" \
 		-c "Add :CFBundleVersion string 1" \
 		-c "Add :CFBundleShortVersionString string 1.0" \
 		-c "Add :CFBundlePackageType string APPL" \

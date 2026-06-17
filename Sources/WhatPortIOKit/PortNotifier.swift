@@ -42,7 +42,7 @@ final class PortNotifier: @unchecked Sendable {
     private var matchedIterators: [io_iterator_t] = []
     private var interestNotifications: [UInt64: io_object_t] = [:]
     private var onChange: (@Sendable () -> Void)?
-    private let queue = DispatchQueue(label: "uk.whatport.notifier")
+    private let queue = DispatchQueue(label: "app.whatport.notifier")
     private var debounceTask: Task<Void, Never>?
     // Suppresses the change signal during the initial arming drain, so we
     // don't fire a redundant re-read right after start() (the caller already

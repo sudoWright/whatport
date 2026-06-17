@@ -5,7 +5,7 @@
 A macOS menu bar utility that shows what every USB-C port is doing in real time:
 which ports are active, what protocol, what speed, what power.
 
-Bundle ID: `uk.whatport.whatport`
+Bundle ID: `app.whatport.whatport`
 Minimum deployment: macOS 14.0 (Sonoma)
 Architecture: Apple Silicon only (M1+). Intel Macs use different IOKit classes
 and are out of scope for v1.
