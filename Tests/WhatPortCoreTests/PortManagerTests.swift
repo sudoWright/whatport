@@ -686,6 +686,44 @@ import Testing
     #expect(input.toChargerInfo().isApple == false)
 }
 
+// ChargingStatus is derived from reliable battery fields plus the two verified
+// NotChargingReason bits. Values are real ones observed in the WhatCable corpus.
+@Test func chargingStatusClassifiesFromVerifiedFields() {
+    // Actively charging wins over everything.
+    #expect(ChargingStatus(isCharging: true, fullyCharged: false, notChargingReason: 0) == .charging)
+    #expect(ChargingStatus(isCharging: true, fullyCharged: true, notChargingReason: 0) == .charging)
+    // Full (the value 4194305 carries bit22, but the bool is authoritative).
+    #expect(ChargingStatus(isCharging: false, fullyCharged: true, notChargingReason: 4194305) == .fullyCharged)
+    // bit24 (16777216) and bit55 both mean a deliberate battery-health hold.
+    #expect(ChargingStatus(isCharging: false, fullyCharged: false, notChargingReason: 16777216) == .onHoldForHealth)
+    #expect(ChargingStatus(isCharging: false, fullyCharged: false, notChargingReason: 36028797018963968) == .onHoldForHealth)
+    // An undecoded reason (bit7 = 128) reports generically, never a guess.
+    #expect(ChargingStatus(isCharging: false, fullyCharged: false, notChargingReason: 128) == .notCharging)
+    #expect(ChargingStatus(isCharging: false, fullyCharged: false, notChargingReason: 0) == .notCharging)
+}
+
+// The manager exposes chargingStatus only when a charger is connected
+// (chargingPower non-nil); on battery / no battery it stays nil.
+@Test func portManagerExposesChargingStatus() {
+    let manager = PortManager()
+
+    manager.applySnapshot(PortManagerSnapshot(
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        tbData: [ThunderboltInput(socketID: 1)],
+        chargingPower: ChargingPowerInput(systemPowerIn: 0, systemVoltageIn: 0, systemCurrentIn: 0,
+                                          isCharging: false, fullyCharged: false,
+                                          notChargingReason: 16777216)
+    ))
+    #expect(manager.chargingStatus == .onHoldForHealth)
+
+    // No chargingPower -> nil (on battery / desktop).
+    manager.applySnapshot(PortManagerSnapshot(
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        tbData: [ThunderboltInput(socketID: 1)]
+    ))
+    #expect(manager.chargingStatus == nil)
+}
+
 // Without HPM data (Intel / desktop / tests), ports still correlate by number
 // and simply carry no UUID. Confirms the legacy fallback path is intact.
 @Test func portManagerCorrelatesWithoutHPMData() {

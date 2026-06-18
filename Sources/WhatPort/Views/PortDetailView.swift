@@ -8,6 +8,9 @@ struct PortDetailView: View {
     let powerMeteringAvailable: Bool
     var isCharging: Bool = false
     var fullyCharged: Bool = false
+    // System-level charging status (nil unless a charger is connected). Shown
+    // on the charger port to answer "why isn't my Mac charging?".
+    var chargingStatus: ChargingStatus? = nil
     // Lifetime counts the user has acknowledged (Pro "Reset Health Counters"),
     // subtracted from the health badge so it agrees with the Flight Recorder.
     var acknowledged: AcknowledgedCounters? = nil
@@ -496,9 +499,19 @@ struct PortDetailView: View {
 
     // MARK: - Power Section
 
+    // Show the system charging status on the port that is the charger (or any
+    // port delivering power into the Mac), not on every port's power section.
+    private var showsChargingStatus: Bool {
+        port.primaryProtocol == .charging || port.power?.direction == .incoming
+    }
+
     private var powerSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             sectionHeader("Power")
+
+            if let status = chargingStatus, showsChargingStatus {
+                chargingStatusRow(status)
+            }
 
             if let charger = port.charger {
                 chargerRow(charger)
@@ -529,6 +542,11 @@ struct PortDetailView: View {
                         )
                     }
                 }
+            } else if chargingStatus != nil, showsChargingStatus {
+                // The charging-status line above already explains this port's
+                // state (e.g. a charger on hold draws no battery current). Skip
+                // the "Not sourcing power" fallback so it doesn't contradict it.
+                EmptyView()
             } else if !powerMeteringAvailable {
                 Text("Per-port power metering not reported on this Mac")
                     .font(.subheadline)
@@ -538,6 +556,38 @@ struct PortDetailView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    // The Mac's charging status line. Charging and full read in green; the
+    // deliberate battery-health hold reads in amber (informational); the generic
+    // "not charging" bucket reads neutral grey, since without a verified reason
+    // it may be benign (e.g. just topped off) and amber would over-alarm.
+    private func chargingStatusRow(_ status: ChargingStatus) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Status")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Text(chargingStatusText(status))
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(chargingStatusColor(status))
+        }
+    }
+
+    private func chargingStatusText(_ status: ChargingStatus) -> String {
+        switch status {
+        case .charging:        return "Charging"
+        case .fullyCharged:    return "Fully charged"
+        case .onHoldForHealth: return "On hold to protect battery health"
+        case .notCharging:     return "Plugged in, not charging"
+        }
+    }
+
+    private func chargingStatusColor(_ status: ChargingStatus) -> Color {
+        switch status {
+        case .charging, .fullyCharged: return .green
+        case .onHoldForHealth:         return .yellow
+        case .notCharging:             return .gray
         }
     }
 

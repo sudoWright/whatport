@@ -45,6 +45,7 @@ public struct RawChargingPower: Sendable {
     public let systemCurrentIn: Int   // milliamps
     public let isCharging: Bool       // battery is actively charging
     public let fullyCharged: Bool     // battery is full
+    public let notChargingReason: Int // ChargerData.NotChargingReason bitfield
 }
 
 // One advertised PDO from the charger's USB-PD menu (UsbHvcMenu).
@@ -118,12 +119,20 @@ public enum PowerReader {
             let telemetry = ioDictionary(props["PowerTelemetryData"])
             let powerIn = ioInt(telemetry["SystemPowerIn"])
 
+            // NotChargingReason lives in the ChargerData dict, falling back to the
+            // top level on machines that expose it there.
+            let chargerData = ioDictionary(props["ChargerData"])
+            let notChargingReason = chargerData["NotChargingReason"] != nil
+                ? ioInt(chargerData["NotChargingReason"])
+                : ioInt(props["NotChargingReason"])
+
             result = RawChargingPower(
                 systemPowerIn: powerIn,
                 systemVoltageIn: ioInt(telemetry["SystemVoltageIn"]),
                 systemCurrentIn: ioInt(telemetry["SystemCurrentIn"]),
                 isCharging: isCharging,
-                fullyCharged: fullyCharged
+                fullyCharged: fullyCharged,
+                notChargingReason: notChargingReason
             )
         }
 

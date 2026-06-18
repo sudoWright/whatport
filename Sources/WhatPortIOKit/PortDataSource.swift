@@ -142,7 +142,8 @@ public enum SnapshotReader {
             systemVoltageIn: Int((smc.volts * 1000).rounded()),
             systemCurrentIn: Int((smc.amps * 1000).rounded()),
             isCharging: battery.isCharging,
-            fullyCharged: battery.fullyCharged
+            fullyCharged: battery.fullyCharged,
+            notChargingReason: battery.notChargingReason
         )
     }
 }

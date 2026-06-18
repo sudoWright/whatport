@@ -608,6 +608,39 @@ public struct PortTransports: Sendable, Equatable {
     }
 }
 
+// MARK: - Charging Status
+
+// The Mac's charging state when a charger is connected. Answers "why isn't my
+// Mac charging?" without guessing: it is derived from reliable AppleSmartBattery
+// fields (IsCharging, FullyCharged) plus the two NotChargingReason bits whose
+// meaning is verified against the WhatCable corpus. Every other NotChargingReason
+// value reports generically (.notCharging) rather than a guessed reason.
+public enum ChargingStatus: Sendable, Equatable {
+    case charging          // actively charging
+    case fullyCharged      // battery is full
+    case onHoldForHealth   // plugged in and capable, deliberately held below
+                           // full (Optimized Battery Charging or an 80% limit)
+    case notCharging       // plugged in, not charging, no reliably-known reason
+
+    // NotChargingReason bits verified to mean "deliberate battery-health hold":
+    // bit 24 (0x1000000) and bit 55. Across the corpus both appear only when the
+    // Mac is plugged in, charge-capable, not full, and sitting at roughly 80%.
+    // Higher bits and others are not reliably decoded and are treated generically.
+    static let healthHoldMask: Int = (1 << 24) | (1 << 55)
+
+    public init(isCharging: Bool, fullyCharged: Bool, notChargingReason: Int) {
+        if isCharging {
+            self = .charging
+        } else if fullyCharged {
+            self = .fullyCharged
+        } else if (notChargingReason & ChargingStatus.healthHoldMask) != 0 {
+            self = .onHoldForHealth
+        } else {
+            self = .notCharging
+        }
+    }
+}
+
 // MARK: - Protocol Classification
 
 public enum PortProtocol: Sendable, Equatable, Codable {

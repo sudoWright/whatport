@@ -85,7 +85,8 @@ enum SnapshotAdapter {
                     systemVoltageIn: cp.systemVoltageIn,
                     systemCurrentIn: cp.systemCurrentIn,
                     isCharging: cp.isCharging,
-                    fullyCharged: cp.fullyCharged
+                    fullyCharged: cp.fullyCharged,
+                    notChargingReason: cp.notChargingReason
                 )
             },
             chargerIdentity: snapshot.chargerIdentity.map { ci in

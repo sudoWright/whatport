@@ -220,6 +220,7 @@ struct PortListView: View {
                 powerMeteringAvailable: portManager.powerMeteringAvailable,
                 isCharging: portManager.isCharging,
                 fullyCharged: portManager.fullyCharged,
+                chargingStatus: portManager.chargingStatus,
                 acknowledged: portManager.recorder?.acknowledgedCounters(forPort: port.id)
             )
         }

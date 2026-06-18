@@ -16,6 +16,9 @@ public final class PortManager: @unchecked Sendable {
     // Battery / charging state (system-level, not per-port)
     public private(set) var isCharging: Bool = false
     public private(set) var fullyCharged: Bool = false
+    // The Mac's charging status when a charger is connected (nil on battery or
+    // on a Mac with no battery controller). Answers "why isn't it charging?".
+    public private(set) var chargingStatus: ChargingStatus?
 
     // Power history for sparkline graphs (per port ID)
     public private(set) var powerHistory: [Int: [PowerSample]] = [:]
@@ -36,6 +39,15 @@ public final class PortManager: @unchecked Sendable {
         powerMeteringAvailable = snapshot.powerMeteringAvailable
         isCharging = snapshot.chargingPower?.isCharging ?? false
         fullyCharged = snapshot.chargingPower?.fullyCharged ?? false
+        // chargingPower is non-nil only when a charger is connected (the reader
+        // gates on ExternalConnected), so nil here means on battery / no battery.
+        chargingStatus = snapshot.chargingPower.map {
+            ChargingStatus(
+                isCharging: $0.isCharging,
+                fullyCharged: $0.fullyCharged,
+                notChargingReason: $0.notChargingReason
+            )
+        }
 
         let correlated = correlate(
             hpmPorts: snapshot.hpmPorts,
@@ -376,19 +388,22 @@ public struct ChargingPowerInput: Sendable {
     public let systemCurrentIn: Int   // milliamps
     public let isCharging: Bool       // battery is actively charging
     public let fullyCharged: Bool     // battery is full
+    public let notChargingReason: Int // AppleSmartBattery NotChargingReason bitfield
 
     public init(
         systemPowerIn: Int,
         systemVoltageIn: Int,
         systemCurrentIn: Int,
         isCharging: Bool = false,
-        fullyCharged: Bool = false
+        fullyCharged: Bool = false,
+        notChargingReason: Int = 0
     ) {
         self.systemPowerIn = systemPowerIn
         self.systemVoltageIn = systemVoltageIn
         self.systemCurrentIn = systemCurrentIn
         self.isCharging = isCharging
         self.fullyCharged = fullyCharged
+        self.notChargingReason = notChargingReason
     }
 }
 
