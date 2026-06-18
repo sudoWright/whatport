@@ -10,8 +10,8 @@ Free and open source. Apple Silicon only (M1 and later).
 
 <p align="center">
   <img src="screenshots/port-list.webp" width="280" alt="WhatPort port list showing connected devices">
-  <img src="screenshots/detail-displayport.png" width="280" alt="Port detail showing DisplayPort alt-mode lanes and link speeds">
-  <img src="screenshots/detail-power.png" width="280" alt="Port detail showing power delivery and a rolling power graph">
+  <img src="screenshots/detail-connections.webp" width="280" alt="Port detail showing display link rate and lanes, plus the connections the port has set up">
+  <img src="screenshots/detail-charging.webp" width="280" alt="Port detail showing charging status, the named charger and its power menu, and a rolling power graph">
 </p>
 
 ## Features
