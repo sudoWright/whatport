@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#2563eb">
     <title>WhatPort: Real-time USB-C port monitoring for Mac</title>
     <meta
       name="description"
@@ -13,15 +14,18 @@
     <link rel="apple-touch-icon" href="icon.png">
 
     <meta property="og:type" content="website">
+    <meta property="og:site_name" content="WhatPort">
     <meta property="og:url" content="https://www.whatport.app/">
     <meta property="og:title" content="WhatPort: Real-time USB-C port monitoring for Mac">
     <meta property="og:description" content="See what every USB-C port on your Mac is doing. Protocol detection, live lane status, and power monitoring in a menu bar app.">
     <meta property="og:image" content="https://www.whatport.app/screenshot-list.webp">
+    <meta property="og:image:alt" content="WhatPort menu bar app showing live USB-C port status">
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="WhatPort: Real-time USB-C port monitoring for Mac">
     <meta name="twitter:description" content="See what every USB-C port on your Mac is doing. Protocol detection, live lane status, and power monitoring in a menu bar app.">
     <meta name="twitter:image" content="https://www.whatport.app/screenshot-list.webp">
+    <meta name="twitter:image:alt" content="WhatPort menu bar app showing live USB-C port status">
 
     <script type="application/ld+json">
     {
@@ -48,13 +52,86 @@
       "description": "Real-time USB-C port monitoring for Mac. See protocol, speed, lane status, and power for every port.",
       "url": "https://www.whatport.app",
       "downloadUrl": "https://github.com/darrylmorley/whatport/releases/latest",
-      "softwareVersion": "1.1.2",
+      "softwareVersion": "1.3.1",
       "author": {
         "@type": "Person",
         "name": "Darryl Morley",
         "url": "https://github.com/darrylmorley"
       },
       "license": "https://opensource.org/licenses/MIT"
+    }
+    </script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Does it work on Intel Macs?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. WhatPort reads data from Apple Silicon-specific IOKit services (AppleTypeCPhy, IOPortTransportStateCC) that don't exist on Intel Macs. You need an M1 or later."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it work on desktop Macs?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. On Macs without a battery (Mac mini, Mac Studio, Mac Pro), WhatPort reads per-port power from the SMC, so power, protocol, and lane data all work the same as on a laptop."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it need root or special permissions?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. All IOKit reads are unprivileged. No entitlements, no System Extension, no background daemon. It runs as a regular menu bar app."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it phone home?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. There are no analytics, no telemetry, and no network requests. The app reads local IOKit data and nothing else. The source is on GitHub if you want to verify."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does the two-Mac licence work?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "One key activates Pro on up to two Macs, so your laptop and your desktop are both covered. Paste the same key into the app on each machine under Flight Recorder. Replacing a Mac? Email support and we'll free up a slot."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How is this different from WhatCable?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "WhatCable focuses on cable identity: what a cable can do, its e-marker data, and charging diagnostics. WhatPort focuses on port status: what each port is doing right now, with live lane and power data."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why does my Thunderbolt 5 port show TB4?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "TB5 ports negotiate down to the connected device's capability. If your device only supports TB4, the port runs at TB4 speed. The Thunderbolt section shows both the active link and the port's maximum capability."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why does it say my Mac isn't charging?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "When a charger is connected but the battery isn't filling, WhatPort tells you why: it's charging, already full, or being held below full to protect battery health (Optimized Battery Charging or an 80% limit). It only reports a reason it can confirm, never a guess."
+          }
+        }
+      ]
     }
     </script>
 
@@ -958,16 +1035,16 @@
             <div class="icon" aria-hidden="true">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01M14 12h.01M18 12h.01"/></svg>
             </div>
-            <h3>Device identification</h3>
-            <p>Connected devices show product name, vendor, serial number, USB version, and current draw.</p>
+            <h3>Device and dock identification</h3>
+            <p>Connected devices show product name, vendor, serial number, USB version, and current draw. Thunderbolt docks are named by their own controller.</p>
           </article>
 
           <article class="feature">
             <div class="icon" aria-hidden="true">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
             </div>
-            <h3>Display resolution</h3>
-            <p>Shows native resolution for connected monitors over Thunderbolt or DisplayPort alt-mode.</p>
+            <h3>Display detail</h3>
+            <p>Native resolution plus link rate (HBR2/HBR3), lanes in use, native versus Thunderbolt-tunnelled, display count, and any hub or HDMI converter in the chain.</p>
           </article>
 
           <article class="feature">
@@ -984,6 +1061,38 @@
             </div>
             <h3>Cable info</h3>
             <p>Cable type (active/passive) and USB PD revision detected from the cable's e-marker data.</p>
+          </article>
+
+          <article class="feature">
+            <div class="icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            </div>
+            <h3>Connections</h3>
+            <p>What the port has actually set up (USB 2, USB 3, DisplayPort, and so on), and a flag when macOS has blocked one. The usual reason a dock's USB or display won't work.</p>
+          </article>
+
+          <article class="feature">
+            <div class="icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="11" x2="23" y2="13"/><path d="M11 9l-2 3h3l-2 3"/></svg>
+            </div>
+            <h3>Charging status</h3>
+            <p>When a charger is plugged in but not charging, WhatPort says why: charging, fully charged, held to protect battery health, or simply not charging. Never a guess.</p>
+          </article>
+
+          <article class="feature">
+            <div class="icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0z"/><path d="M12 17v5"/></svg>
+            </div>
+            <h3>Charger identification</h3>
+            <p>Names the connected adapter and lists its full advertised power menu, so you can see a 96W brick is a 96W brick even when little is being drawn.</p>
+          </article>
+
+          <article class="feature">
+            <div class="icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+            </div>
+            <h3>Liquid detection</h3>
+            <p>Flags a wet port before corrosion sets in, with advice to disconnect and dry it out (M3 and later).</p>
           </article>
         </div>
       </div>
@@ -1158,6 +1267,10 @@
           <div class="faq-item">
             <h3>Why does my Thunderbolt 5 port show TB4?</h3>
             <p>TB5 ports negotiate down to the connected device's capability. If your device only supports TB4, the port runs at TB4 speed. The Thunderbolt section shows both the active link and the port's maximum capability.</p>
+          </div>
+          <div class="faq-item">
+            <h3>Why does it say my Mac isn't charging?</h3>
+            <p>When a charger is connected but the battery isn't filling, WhatPort tells you why: it's charging, already full, or being held below full to protect battery health (Optimized Battery Charging or an 80% limit). It only reports a reason it can confirm, never a guess.</p>
           </div>
         </div>
       </div>
