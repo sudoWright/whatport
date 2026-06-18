@@ -6,7 +6,6 @@ struct PortListView: View {
     var portManager: PortManager
     var footerContext: FooterContext
     @State private var selectedPortID: Int?
-    @State private var showingSettings = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -15,7 +14,7 @@ struct PortListView: View {
             if let panelIndex = footerContext.showingPanelIndex {
                 pluginPanel(index: panelIndex)
                     .transition(pushTransition(edge: .trailing))
-            } else if showingSettings {
+            } else if footerContext.showingSettings {
                 settingsPanel
                     .transition(pushTransition(edge: .trailing))
             } else if let selectedID = selectedPortID,
@@ -176,7 +175,7 @@ struct PortListView: View {
 
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    showingSettings = true
+                    footerContext.showingSettings = true
                 }
             } label: {
                 Image(systemName: "gear")
@@ -233,7 +232,7 @@ struct PortListView: View {
             HStack {
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        showingSettings = false
+                        footerContext.showingSettings = false
                     }
                 }) {
                     HStack(spacing: 4) {

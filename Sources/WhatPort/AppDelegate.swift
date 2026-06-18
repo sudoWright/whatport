@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var mainWindow: NSWindow?
+    private var aboutWindow: NSWindow?
     private var footerContext: FooterContext?
     private let portManager = PortManager()
     private let dataSource = LivePortDataSource()
@@ -134,8 +135,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     button.image = image
                 }
                 button.imagePosition = .imageLeading
-                button.action = #selector(togglePopover)
+                button.action = #selector(statusItemClicked)
                 button.target = self
+                // Left-click toggles the popover; right-click (or control-click)
+                // shows the context menu. Both routed through one action.
+                button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             }
             statusItem = item
             updateBadge()
@@ -226,7 +230,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    @objc private func togglePopover() {
+    // Single action for the status item: route left-click to the popover and
+    // right-click (or control-click) to the context menu.
+    @objc private func statusItemClicked() {
+        let event = NSApp.currentEvent
+        let isRightClick = event?.type == .rightMouseUp
+            || (event?.modifierFlags.contains(.control) ?? false)
+        if isRightClick {
+            showContextMenu()
+        } else {
+            togglePopover()
+        }
+    }
+
+    private func togglePopover() {
         guard let popover, let button = statusItem?.button else { return }
 
         if popover.isShown {
@@ -235,5 +252,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
         }
+    }
+
+    private func showPopover() {
+        guard let popover, let button = statusItem?.button else { return }
+        if !popover.isShown {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        }
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    // MARK: - Status item context menu (right-click)
+
+    private func showContextMenu() {
+        guard let statusItem, let button = statusItem.button else { return }
+        // Close the popover first so the menu doesn't overlap it.
+        if let popover, popover.isShown { popover.performClose(nil) }
+
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Settings\u{2026}", action: #selector(openSettings), keyEquivalent: "").target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "WhatPort on GitHub", action: #selector(openGitHub), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "About WhatPort", action: #selector(openAbout), keyEquivalent: "").target = self
+
+        // Temporarily attach the menu so it pops from the status item, then
+        // detach so a plain left-click still toggles the popover.
+        statusItem.menu = menu
+        button.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    @objc private func openSettings() {
+        makeFooterContext().showingSettings = true
+        showPopover()
+    }
+
+    @objc private func openGitHub() {
+        NSWorkspace.shared.open(AboutView.gitHubURL)
+    }
+
+    @objc private func openAbout() {
+        if let aboutWindow {
+            aboutWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let window = NSWindow(contentViewController: NSHostingController(rootView: AboutView()))
+        window.title = "About WhatPort"
+        window.styleMask = [.titled, .closable]
+        window.isReleasedWhenClosed = false
+        window.center()
+        aboutWindow = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }

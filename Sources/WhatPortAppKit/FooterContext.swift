@@ -22,6 +22,11 @@ public final class FooterContext {
     // instead of the port list. Set by plugin buttons.
     public var showingPanelIndex: Int?
 
+    // When true, PortListView shows the settings panel. Hoisted here (rather
+    // than PortListView's local state) so the menu-bar right-click menu can
+    // open settings too, not just the footer gear button.
+    public var showingSettings: Bool = false
+
     public init(portManager: PortManager) {
         self.portManager = portManager
     }
