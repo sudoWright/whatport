@@ -250,7 +250,24 @@ struct PortListView: View {
 
             Divider()
 
-            SettingsView()
+            // Scroll the settings body so the pinned Back header above stays
+            // tappable. Without this, a tall body - e.g. when the Pro Flight
+            // Recorder plugin injects its licence / history / health-counter
+            // sections - overflows the fixed 420pt panel, gets cut off by the
+            // outer .clipped(), and pushes Back above the visible area with no
+            // way to reach it.
+            //
+            // minHeight = the viewport height keeps SettingsView filling the
+            // panel when its content is short (base build), so its trailing
+            // Spacer still pins the About block to the bottom instead of
+            // bunching it under the toggles. When the body is taller than the
+            // viewport (Pro sections present), it simply scrolls.
+            GeometryReader { proxy in
+                ScrollView {
+                    SettingsView()
+                        .frame(minHeight: proxy.size.height)
+                }
+            }
         }
         .frame(height: 420)
     }

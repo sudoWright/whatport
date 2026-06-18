@@ -20,6 +20,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Single-instance guard. If another instance of this bundle is already
+        // running, this process is a redundant launch - most commonly the
+        // keep-alive LaunchAgent's RunAtLoad firing the instant the user enables
+        // "Launch at Login" while the app is already up, which would otherwise add
+        // a second menu-bar item. Exit before building any UI (and before any
+        // plugin bootstrap) so the original instance keeps its single status item.
+        // A clean exit also means KeepAlive (SuccessfulExit=false) won't relaunch.
+        //
+        // Elect the lowest-PID instance as the sole survivor: only terminate
+        // when an older (lower-PID) instance exists. This way two launches
+        // racing at the same instant can't each see the other and both quit,
+        // which would leave zero running. The eldest always stays.
+        //
+        // Skip the guard if we can't identify our own bundle (dev/ad-hoc builds
+        // with no Info.plist): querying runningApplications(withBundleIdentifier:)
+        // for an empty string would match unrelated ID-less processes and make
+        // the app self-terminate on every launch.
+        let me = NSRunningApplication.current
+        if let bundleID = me.bundleIdentifier, !bundleID.isEmpty {
+            let elder = NSRunningApplication
+                .runningApplications(withBundleIdentifier: bundleID)
+                .filter { $0.processIdentifier != me.processIdentifier }
+                .min { $0.processIdentifier < $1.processIdentifier }
+            if let elder, elder.processIdentifier < me.processIdentifier {
+                NSApp.terminate(nil)
+                return
+            }
+        }
+
         if let iconURL = Bundle.whatPortResources.url(forResource: "AppIcon", withExtension: "png"),
            let iconImage = NSImage(contentsOf: iconURL) {
             NSApplication.shared.applicationIconImage = iconImage
