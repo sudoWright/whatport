@@ -7,7 +7,7 @@ import WhatPortAppKit
 import WhatPortPlugins
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var mainWindow: NSWindow?
@@ -23,6 +23,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let iconURL = Bundle.whatPortResources.url(forResource: "AppIcon", withExtension: "png"),
            let iconImage = NSImage(contentsOf: iconURL) {
             NSApplication.shared.applicationIconImage = iconImage
+        }
+
+        // The Settings shortcut (Cmd+,) is wired through SwiftUI's command
+        // system (see WhatPortApp) and routed back here. Quit (Cmd+Q) is
+        // SwiftUI's standard menu item. Listen for the Settings command.
+        NotificationCenter.default.addObserver(
+            forName: .openSettingsRequested,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.openSettings() }
         }
 
         isSupported = HardwareCheck.isAppleSilicon()
@@ -150,6 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             popover.behavior = .transient
             popover.contentSize = NSSize(width: 320, height: 560)
             popover.contentViewController = NSHostingController(rootView: surfaceContent())
+            popover.delegate = self
             self.popover = popover
         }
     }
@@ -262,18 +274,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    // Reset to the port list when the popover is dismissed, so a later plain
+    // left-click always opens to the list, not whatever settings panel was last
+    // shown. (showingSettings lives on the shared FooterContext now.)
+    func popoverDidClose(_ notification: Notification) {
+        footerContext?.showingSettings = false
+    }
+
     // MARK: - Status item context menu (right-click)
 
     private func showContextMenu() {
         guard let statusItem, let button = statusItem.button else { return }
-        // Close the popover first so the menu doesn't overlap it.
-        if let popover, popover.isShown { popover.performClose(nil) }
+        // Close the popover first so the menu doesn't overlap it. Immediate
+        // (not animated) so it's gone before the menu pops.
+        if let popover, popover.isShown { popover.close() }
 
         let menu = NSMenu()
-        menu.addItem(withTitle: "Settings\u{2026}", action: #selector(openSettings), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Settings\u{2026}", action: #selector(openSettings), keyEquivalent: ",").target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "WhatPort on GitHub", action: #selector(openGitHub), keyEquivalent: "").target = self
         menu.addItem(withTitle: "About WhatPort", action: #selector(openAbout), keyEquivalent: "").target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Quit WhatPort", action: #selector(quitApp), keyEquivalent: "q").target = self
 
         // Temporarily attach the menu so it pops from the status item, then
         // detach so a plain left-click still toggles the popover.
@@ -289,6 +311,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openGitHub() {
         NSWorkspace.shared.open(AboutView.gitHubURL)
+    }
+
+    @objc private func quitApp() {
+        NSApplication.shared.terminate(nil)
     }
 
     @objc private func openAbout() {

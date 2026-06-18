@@ -865,8 +865,10 @@ extension PortManager {
 
             // Name the connected Thunderbolt device from its TB controller.
             // The link itself is built from IOThunderboltPort (no name there);
-            // the CIO node carries the dock/hub identity.
-            if let cio, results[i].thunderboltLink != nil {
+            // the CIO node carries the dock/hub identity. Require an active CIO
+            // node (matching buildLiveTransports) so a stale node left behind
+            // after a fast device swap can't stamp the old name onto a new one.
+            if let cio, cio.active, results[i].thunderboltLink != nil {
                 if !cio.deviceModel.isEmpty {
                     results[i].thunderboltLink?.deviceName = cio.deviceModel
                 }

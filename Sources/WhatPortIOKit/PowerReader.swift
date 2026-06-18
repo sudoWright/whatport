@@ -153,7 +153,9 @@ public enum PowerReader {
                 let dict = ioDictionary(entry)
                 let voltageMV = ioInt(dict["MaxVoltage"])
                 let currentMA = ioInt(dict["MaxCurrent"])
-                guard voltageMV > 0 else { continue }
+                // Skip non-fixed-supply or malformed entries (zero current would
+                // otherwise produce a 0 W PDO and a wattless menu summary).
+                guard voltageMV > 0, currentMA > 0 else { continue }
                 pdos.append(RawChargerPDO(voltageMV: voltageMV, currentMA: currentMA))
             }
 

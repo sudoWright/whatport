@@ -91,6 +91,7 @@ struct PortDetailView: View {
                 sectionCard { powerChart }
             }
             if port.portType != .magSafe {
+                connectionsCard
                 sectionCard { laneInfoSection }
                 if let cap = port.thunderboltCapability {
                     sectionCard { thunderboltSection(capability: cap, link: port.thunderboltLink) }
@@ -385,8 +386,10 @@ struct PortDetailView: View {
             if let health = port.health {
                 healthRow(health)
                     .padding(.top, 2)
-                if health.liquidDetected && health.mitigationsActive {
-                    Text("macOS has limited this port to prevent liquid damage. Disconnect and let it dry.")
+                if health.liquidDetected {
+                    Text(health.mitigationsActive
+                        ? "macOS has limited this port to prevent liquid damage. Disconnect and let it dry."
+                        : "Liquid detected on this port. Disconnect and let it dry.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
