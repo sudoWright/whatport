@@ -45,6 +45,7 @@ public final class PortManager: @unchecked Sendable {
             ccData: snapshot.ccData,
             chargerData: snapshot.chargerData,
             chargingPower: snapshot.chargingPower,
+            chargerIdentity: snapshot.chargerIdentity,
             deviceData: snapshot.deviceData,
             displayData: snapshot.displayData,
             portStatsData: snapshot.portStatsData,
@@ -107,6 +108,7 @@ public struct PortManagerSnapshot: Sendable {
     public let ccData: [CCInput]
     public let chargerData: [ChargerInput]
     public let chargingPower: ChargingPowerInput?
+    public let chargerIdentity: ChargerIdentityInput?
     public let deviceData: [DeviceInput]
     public let displayData: [DisplayInput]
     public let portStatsData: [PortStatsInput]
@@ -126,6 +128,7 @@ public struct PortManagerSnapshot: Sendable {
         ccData: [CCInput] = [],
         chargerData: [ChargerInput] = [],
         chargingPower: ChargingPowerInput? = nil,
+        chargerIdentity: ChargerIdentityInput? = nil,
         deviceData: [DeviceInput] = [],
         displayData: [DisplayInput] = [],
         portStatsData: [PortStatsInput] = [],
@@ -143,6 +146,7 @@ public struct PortManagerSnapshot: Sendable {
         self.ccData = ccData
         self.chargerData = chargerData
         self.chargingPower = chargingPower
+        self.chargerIdentity = chargerIdentity
         self.deviceData = deviceData
         self.displayData = displayData
         self.portStatsData = portStatsData
@@ -284,6 +288,10 @@ public struct HPMPortInput: Sendable {
     public let connectionCount: Int
     public let authorizationStatus: String
     public let ldcmStatus: String
+    public let provisionedTransports: [String]
+    public let unauthorizedTransports: [String]
+    public let liquidDetected: Bool
+    public let mitigationsActive: Bool
 
     public var isMagSafe: Bool {
         portType.lowercased().contains("magsafe")
@@ -297,7 +305,11 @@ public struct HPMPortInput: Sendable {
         plugEventCount: Int = 0,
         connectionCount: Int = 0,
         authorizationStatus: String = "",
-        ldcmStatus: String = ""
+        ldcmStatus: String = "",
+        provisionedTransports: [String] = [],
+        unauthorizedTransports: [String] = [],
+        liquidDetected: Bool = false,
+        mitigationsActive: Bool = false
     ) {
         self.uuid = uuid
         self.portNumber = portNumber
@@ -307,6 +319,10 @@ public struct HPMPortInput: Sendable {
         self.connectionCount = connectionCount
         self.authorizationStatus = authorizationStatus
         self.ldcmStatus = ldcmStatus
+        self.provisionedTransports = provisionedTransports
+        self.unauthorizedTransports = unauthorizedTransports
+        self.liquidDetected = liquidDetected
+        self.mitigationsActive = mitigationsActive
     }
 }
 
@@ -373,6 +389,46 @@ public struct ChargingPowerInput: Sendable {
         self.systemCurrentIn = systemCurrentIn
         self.isCharging = isCharging
         self.fullyCharged = fullyCharged
+    }
+}
+
+// Charger identity from AppleSmartBattery.AdapterDetails. System-level (one
+// active charger); attached in correlation to the port receiving power.
+public struct ChargerIdentityInput: Sendable {
+    public let name: String
+    public let manufacturer: String
+    public let description: String
+    public let maxWatts: Int
+    public let pdos: [ChargerPDO]
+
+    public init(
+        name: String,
+        manufacturer: String = "",
+        description: String = "",
+        maxWatts: Int = 0,
+        pdos: [ChargerPDO] = []
+    ) {
+        self.name = name
+        self.manufacturer = manufacturer
+        self.description = description
+        self.maxWatts = maxWatts
+        self.pdos = pdos
+    }
+
+    // The display name, falling back through description to a generic label.
+    public var resolvedName: String {
+        if !name.isEmpty { return name }
+        if !description.isEmpty { return description }
+        return "PD charger"
+    }
+
+    public func toChargerInfo() -> ChargerInfo {
+        ChargerInfo(
+            name: resolvedName,
+            manufacturer: manufacturer,
+            maxWatts: maxWatts,
+            pdos: pdos
+        )
     }
 }
 
@@ -489,6 +545,8 @@ public struct DPTransportInput: Sendable {
     public let maxLaneCount: Int
     public let tunneled: Bool
     public let sinkCount: Int
+    public let branchDevice: String      // MST hub / converter chip, e.g. "Dp1.2"
+    public let dfpType: String           // downstream port type, e.g. "HDMI"
 
     public init(
         portNumber: Int,
@@ -497,7 +555,9 @@ public struct DPTransportInput: Sendable {
         laneCount: Int = 0,
         maxLaneCount: Int = 0,
         tunneled: Bool = false,
-        sinkCount: Int = 0
+        sinkCount: Int = 0,
+        branchDevice: String = "",
+        dfpType: String = ""
     ) {
         self.portNumber = portNumber
         self.active = active
@@ -506,6 +566,8 @@ public struct DPTransportInput: Sendable {
         self.maxLaneCount = maxLaneCount
         self.tunneled = tunneled
         self.sinkCount = sinkCount
+        self.branchDevice = branchDevice
+        self.dfpType = dfpType
     }
 }
 
@@ -514,17 +576,29 @@ public struct CIOTransportInput: Sendable {
     public let active: Bool
     public let dataRate: String
     public let tunneled: Bool
+    public let tunnelProvisioned: [String]
+    public let tunnelSupported: [String]
+    public let deviceModel: String
+    public let deviceVendor: String
 
     public init(
         portNumber: Int,
         active: Bool = false,
         dataRate: String = "",
-        tunneled: Bool = false
+        tunneled: Bool = false,
+        tunnelProvisioned: [String] = [],
+        tunnelSupported: [String] = [],
+        deviceModel: String = "",
+        deviceVendor: String = ""
     ) {
         self.portNumber = portNumber
         self.active = active
         self.dataRate = dataRate
         self.tunneled = tunneled
+        self.tunnelProvisioned = tunnelProvisioned
+        self.tunnelSupported = tunnelSupported
+        self.deviceModel = deviceModel
+        self.deviceVendor = deviceVendor
     }
 }
 
@@ -565,6 +639,7 @@ extension PortManager {
         ccData: [CCInput],
         chargerData: [ChargerInput] = [],
         chargingPower: ChargingPowerInput? = nil,
+        chargerIdentity: ChargerIdentityInput? = nil,
         deviceData: [DeviceInput] = [],
         displayData: [DisplayInput] = [],
         portStatsData: [PortStatsInput] = [],
@@ -629,7 +704,9 @@ extension PortManager {
                     plugEventCount: hpm.plugEventCount,
                     connectionCount: hpm.connectionCount,
                     authorizationStatus: hpm.authorizationStatus,
-                    ldcmStatus: hpm.ldcmStatus
+                    ldcmStatus: hpm.ldcmStatus,
+                    liquidDetected: hpm.liquidDetected,
+                    mitigationsActive: hpm.mitigationsActive
                 )
                 return state
             }
@@ -673,6 +750,10 @@ extension PortManager {
         // the SMC D-index is not the physical port number.
         applySMCPower(to: &results, smcPortPower: smcPortPower)
 
+        // Name the charger on whichever port ended up receiving power. Runs
+        // after every power path so it only tags a confirmed incoming port.
+        applyChargerIdentity(to: &results, chargerIdentity: chargerIdentity)
+
         // Build lookup dictionaries for enrichment data
         let devicesByPort = Dictionary(
             deviceData.map { ($0.portNumber, $0) },
@@ -688,6 +769,16 @@ extension PortManager {
         )
         let ccByPortFull = Dictionary(
             usbCCC.map { ($0.portNumber, $0) },
+            uniquingKeysWith: { a, _ in a }
+        )
+        // HPM transport lists are keyed by physical port number. MagSafe is
+        // charge-only and has no data transports, so only USB-C ports qualify.
+        let hpmByPort = Dictionary(
+            hpmPorts.filter { !$0.isMagSafe }.map { ($0.portNumber, $0) },
+            uniquingKeysWith: { a, _ in a }
+        )
+        let cioByPort = Dictionary(
+            cioTransport.map { ($0.portNumber, $0) },
             uniquingKeysWith: { a, _ in a }
         )
 
@@ -756,6 +847,33 @@ extension PortManager {
                 dpTransport: dpTransport,
                 cioTransport: cioTransport
             )
+
+            // Provisioned / blocked / tunnelled transports (the "why doesn't
+            // my dock work" answer). HPM lists are M3+; CIO lists need a TB
+            // link. Only attach when something is actually present.
+            let hpm = hpmByPort[portID]
+            let cio = cioByPort[portID]
+            let transports = PortTransports(
+                provisioned: hpm?.provisionedTransports ?? [],
+                unauthorized: hpm?.unauthorizedTransports ?? [],
+                tunnelProvisioned: cio?.tunnelProvisioned ?? [],
+                tunnelSupported: cio?.tunnelSupported ?? []
+            )
+            if transports.hasData {
+                results[i].transports = transports
+            }
+
+            // Name the connected Thunderbolt device from its TB controller.
+            // The link itself is built from IOThunderboltPort (no name there);
+            // the CIO node carries the dock/hub identity.
+            if let cio, results[i].thunderboltLink != nil {
+                if !cio.deviceModel.isEmpty {
+                    results[i].thunderboltLink?.deviceName = cio.deviceModel
+                }
+                if !cio.deviceVendor.isEmpty {
+                    results[i].thunderboltLink?.deviceVendor = cio.deviceVendor
+                }
+            }
         }
 
         return results
@@ -792,7 +910,10 @@ extension PortManager {
                 dataRate: dp.linkRate,
                 laneCount: dp.laneCount,
                 maxLaneCount: dp.maxLaneCount,
-                tunneled: dp.tunneled
+                tunneled: dp.tunneled,
+                sinkCount: dp.sinkCount,
+                branchDevice: dp.branchDevice,
+                dfpType: dp.dfpType
             ))
         }
 
@@ -942,6 +1063,22 @@ extension PortManager {
         }
     }
 
+    // Attach the active charger's identity to the port(s) receiving power.
+    // The charger is system-level (AppleSmartBattery reports one active
+    // adapter), so we tag every incoming port; in practice that is the single
+    // port with the live USB-PD / MagSafe contract. No-op on desktops (no
+    // battery controller) or when nothing is charging.
+    private func applyChargerIdentity(
+        to results: inout [PortState],
+        chargerIdentity: ChargerIdentityInput?
+    ) {
+        guard let chargerIdentity else { return }
+        let info = chargerIdentity.toChargerInfo()
+        for i in results.indices where results[i].power?.direction == .incoming {
+            results[i].charger = info
+        }
+    }
+
     // Normalise an HPM UUID to match the SMC DxUI form: dashes stripped,
     // lowercase (e.g. "6230AF2D-EE59-..." -> "6230af2dee59...").
     private func normalisedUUID(_ uuid: String) -> String {
@@ -965,7 +1102,9 @@ extension PortManager {
                 plugEventCount: hpm.plugEventCount,
                 connectionCount: hpm.connectionCount,
                 authorizationStatus: hpm.authorizationStatus,
-                ldcmStatus: hpm.ldcmStatus
+                ldcmStatus: hpm.ldcmStatus,
+                liquidDetected: hpm.liquidDetected,
+                mitigationsActive: hpm.mitigationsActive
             )
         }
     }

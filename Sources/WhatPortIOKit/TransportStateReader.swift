@@ -36,6 +36,8 @@ public struct RawDPTransportState: Sendable {
     public let maxLaneCount: Int         // 4
     public let tunneled: Bool
     public let sinkCount: Int            // number of connected displays
+    public let branchDevice: String      // MST hub / converter chip ID, e.g. "Dp1.2"
+    public let dfpType: String           // downstream-facing port type, e.g. "HDMI"
 }
 
 public struct RawCIOTransportState: Sendable {
@@ -43,6 +45,14 @@ public struct RawCIOTransportState: Sendable {
     public let active: Bool
     public let dataRate: String
     public let tunneled: Bool
+    // Which protocols are tunnelled over this TB/USB4 link right now
+    // (e.g. ["USB3", "DisplayPort", "PCIe"]), and which the link could carry.
+    public let tunnelProvisioned: [String]
+    public let tunnelSupported: [String]
+    // Identity of the connected Thunderbolt device (dock, hub) from its TB
+    // controller, e.g. "TS3 Plus" / "CalDigit". Empty when not reported.
+    public let deviceModel: String
+    public let deviceVendor: String
 }
 
 // MARK: - Reader
@@ -83,7 +93,9 @@ public enum TransportStateReader {
                 laneCount: ioInt(props["LaneCount"]),
                 maxLaneCount: ioInt(props["MaxLaneCount"]),
                 tunneled: ioBool(props["Tunneled"]),
-                sinkCount: ioInt(props["SinkCount"])
+                sinkCount: ioInt(props["SinkCount"]),
+                branchDevice: ioString(props["BranchDeviceID"]),
+                dfpType: ioString(props["DFP Type Description"])
             )
             results.append(data)
         }
@@ -101,7 +113,11 @@ public enum TransportStateReader {
                 portNumber: ioInt(props["ParentBuiltInPortNumber"]),
                 active: ioBool(props["Active"]),
                 dataRate: ioString(props["DataRateDescription"]),
-                tunneled: ioBool(props["Tunneled"])
+                tunneled: ioBool(props["Tunneled"]),
+                tunnelProvisioned: ioStringArray(props["TunneledTransportsProvisioned"]),
+                tunnelSupported: ioStringArray(props["TunneledTransportsSupported"]),
+                deviceModel: ioString(props["Device Model Name"]),
+                deviceVendor: ioString(props["Device Vendor Name"])
             )
             results.append(data)
         }

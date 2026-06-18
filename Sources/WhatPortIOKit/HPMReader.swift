@@ -26,6 +26,14 @@ public struct RawHPMPort: Sendable {
     public let connectionCount: Int
     public let authorizationStatus: String
     public let ldcmStatus: String
+    // Transports the controller has actually set up for the current connection
+    // (e.g. ["CC", "USB2", "USB3", "DP"]), and any it negotiated then blocked.
+    public let provisionedTransports: [String]
+    public let unauthorizedTransports: [String]
+    // Liquid detection (LDCM). liquidDetected is the definitive wet-port flag;
+    // mitigationsActive means macOS has restricted the port to limit damage.
+    public let liquidDetected: Bool
+    public let mitigationsActive: Bool
 
     public var isMagSafe: Bool {
         portType.lowercased().contains("magsafe")
@@ -73,6 +81,10 @@ public enum HPMReader {
                 let connectionCount = ioInt(ioProperty(service, key: "ConnectionCount"))
                 let authorizationStatus = ioString(ioProperty(service, key: "UserAuthorizationStatusDescription"))
                 let ldcmStatus = ioString(ioProperty(service, key: "LDCM_MeasurementStatusDescription"))
+                let provisioned = ioStringArray(ioProperty(service, key: "TransportsProvisioned"))
+                let unauthorized = ioStringArray(ioProperty(service, key: "TransportsUnauthorized"))
+                let liquidDetected = ioBool(ioProperty(service, key: "LDCM_LiquidDetected"))
+                let mitigationsActive = ioBool(ioProperty(service, key: "LDCM_MitigationsEnabled"))
 
                 results.append(RawHPMPort(
                     uuid: uuid,
@@ -83,7 +95,11 @@ public enum HPMReader {
                     plugEventCount: plugEventCount,
                     connectionCount: connectionCount,
                     authorizationStatus: authorizationStatus,
-                    ldcmStatus: ldcmStatus
+                    ldcmStatus: ldcmStatus,
+                    provisionedTransports: provisioned,
+                    unauthorizedTransports: unauthorized,
+                    liquidDetected: liquidDetected,
+                    mitigationsActive: mitigationsActive
                 ))
             }
         }

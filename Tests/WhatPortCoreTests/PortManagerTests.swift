@@ -512,6 +512,180 @@ import Testing
     #expect(port?.health?.isHealthy == false)
 }
 
+// HPM provisioned/blocked transports and CIO tunnelled transports both land
+// on PortState.transports. The blocked USB3 is the "why doesn't my dock work"
+// signal, and the tunnelled list shows what is riding the TB link.
+@Test func portManagerSurfacesProvisionedAndBlockedTransports() {
+    let manager = PortManager()
+    let uuid = "6230AF2D-EE59-552E-E28A-652CCC0E7B11"
+
+    let snapshot = PortManagerSnapshot(
+        hpmPorts: [
+            HPMPortInput(
+                uuid: uuid, portNumber: 1, portType: "USB-C",
+                provisionedTransports: ["CC", "USB2", "DP"],
+                unauthorizedTransports: ["USB3"]
+            )
+        ],
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        tbData: [ThunderboltInput(socketID: 1)],
+        cioTransport: [
+            CIOTransportInput(
+                portNumber: 1, active: true,
+                tunnelProvisioned: ["DisplayPort", "PCIe"]
+            )
+        ]
+    )
+
+    manager.applySnapshot(snapshot)
+    let port = manager.ports.first { $0.id == 1 }
+
+    #expect(port?.transports?.provisioned == ["CC", "USB2", "DP"])
+    #expect(port?.transports?.unauthorized == ["USB3"])
+    #expect(port?.transports?.tunnelProvisioned == ["DisplayPort", "PCIe"])
+    #expect(port?.transports?.hasData == true)
+}
+
+// With no HPM transport lists and no CIO tunnel data, transports stays nil
+// (pre-M3 / Intel / desktop) rather than an empty-but-present struct.
+@Test func portManagerLeavesTransportsNilWithoutData() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        tbData: [ThunderboltInput(socketID: 1)]
+    )
+
+    manager.applySnapshot(snapshot)
+    #expect(manager.ports.first { $0.id == 1 }?.transports == nil)
+}
+
+// Liquid detection is the most serious health signal: it makes the port
+// unhealthy regardless of counters.
+@Test func portManagerFlagsLiquidDetectionAsSerious() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        hpmPorts: [
+            HPMPortInput(
+                uuid: "6230AF2D-EE59-552E-E28A-652CCC0E7B11",
+                portNumber: 1, portType: "USB-C",
+                ldcmStatus: "No Error",
+                liquidDetected: true,
+                mitigationsActive: true
+            )
+        ],
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        tbData: [ThunderboltInput(socketID: 1)]
+    )
+
+    manager.applySnapshot(snapshot)
+    let port = manager.ports.first { $0.id == 1 }
+
+    #expect(port?.health?.liquidDetected == true)
+    #expect(port?.health?.mitigationsActive == true)
+    #expect(port?.health?.severity == .serious)
+    #expect(port?.health?.isHealthy == false)
+}
+
+// DisplayPort link detail (lanes, sink count, branch chip, downstream type)
+// flows from the DP transport into the port's LiveTransport entry.
+@Test func portManagerCarriesDisplayLinkDetail() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        phyData: [PhyInput(phyID: 0, portNumber: 1, lane0Transport: "DisplayPort", lane0PowerLevel: "on")],
+        tbData: [ThunderboltInput(socketID: 1)],
+        dpTransport: [
+            DPTransportInput(
+                portNumber: 1, active: true, linkRate: "5.4 Gbps (HBR2)",
+                laneCount: 2, maxLaneCount: 4, tunneled: false,
+                sinkCount: 2, branchDevice: "Dp1.2", dfpType: "HDMI"
+            )
+        ]
+    )
+
+    manager.applySnapshot(snapshot)
+    let dp = manager.ports.first { $0.id == 1 }?.liveTransports.first { $0.kind == .displayPort }
+
+    #expect(dp?.laneCount == 2)
+    #expect(dp?.maxLaneCount == 4)
+    #expect(dp?.sinkCount == 2)
+    #expect(dp?.branchDevice == "Dp1.2")
+    #expect(dp?.dfpType == "HDMI")
+}
+
+// The connected Thunderbolt device's identity (from the CIO node) is stamped
+// onto the active TB link.
+@Test func portManagerNamesConnectedThunderboltDevice() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        phyData: [PhyInput(phyID: 0, portNumber: 1, lane0Transport: "CIO", lane0PowerLevel: "on")],
+        tbData: [ThunderboltInput(socketID: 1, currentLinkWidth: 2, currentLinkSpeed: 4)],
+        cioTransport: [
+            CIOTransportInput(portNumber: 1, active: true, deviceModel: "TS3 Plus", deviceVendor: "CalDigit")
+        ]
+    )
+
+    manager.applySnapshot(snapshot)
+    let port = manager.ports.first { $0.id == 1 }
+
+    #expect(port?.thunderboltLink?.deviceName == "TS3 Plus")
+    #expect(port?.thunderboltLink?.deviceVendor == "CalDigit")
+}
+
+// The active charger's identity is attached to the port receiving power.
+@Test func portManagerAttachesChargerIdentityToIncomingPort() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        tbData: [ThunderboltInput(socketID: 1)],
+        ccData: [CCInput(portNumber: 1, portType: "USB-C", active: true)],
+        chargerData: [ChargerInput(portType: "USB-C", portNumber: 1, voltage: 20000, maxCurrent: 5000)],
+        chargingPower: ChargingPowerInput(systemPowerIn: 60000, systemVoltageIn: 20000,
+                                          systemCurrentIn: 3000, isCharging: true),
+        chargerIdentity: ChargerIdentityInput(
+            name: "96W USB-C Power Adapter", manufacturer: "Apple Inc.", maxWatts: 96,
+            pdos: [ChargerPDO(voltageMV: 5000, currentMA: 3000), ChargerPDO(voltageMV: 20000, currentMA: 4700)]
+        )
+    )
+
+    manager.applySnapshot(snapshot)
+    let port = manager.ports.first { $0.id == 1 }
+
+    #expect(port?.power?.direction == .incoming)
+    #expect(port?.charger?.name == "96W USB-C Power Adapter")
+    #expect(port?.charger?.isApple == true)
+    #expect(port?.charger?.maxWatts == 96)
+    #expect(port?.charger?.pdos.count == 2)
+}
+
+// Charger identity is only attached where power is flowing in: a port with no
+// incoming power (or a desktop with no battery) stays nil.
+@Test func portManagerDoesNotAttachChargerWithoutIncomingPower() {
+    let manager = PortManager()
+
+    let snapshot = PortManagerSnapshot(
+        phyData: [PhyInput(phyID: 0, portNumber: 1)],
+        tbData: [ThunderboltInput(socketID: 1)],
+        chargerIdentity: ChargerIdentityInput(name: "PD charger")
+    )
+
+    manager.applySnapshot(snapshot)
+    #expect(manager.ports.first { $0.id == 1 }?.charger == nil)
+}
+
+// A third-party charger reporting only a description still resolves to a
+// usable name rather than an empty string.
+@Test func chargerIdentityFallsBackToDescription() {
+    let input = ChargerIdentityInput(name: "", description: "pd charger")
+    #expect(input.resolvedName == "pd charger")
+    #expect(input.toChargerInfo().name == "pd charger")
+    #expect(input.toChargerInfo().isApple == false)
+}
+
 // Without HPM data (Intel / desktop / tests), ports still correlate by number
 // and simply carry no UUID. Confirms the legacy fallback path is intact.
 @Test func portManagerCorrelatesWithoutHPMData() {

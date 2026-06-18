@@ -47,6 +47,24 @@ public struct RawChargingPower: Sendable {
     public let fullyCharged: Bool     // battery is full
 }
 
+// One advertised PDO from the charger's USB-PD menu (UsbHvcMenu).
+public struct RawChargerPDO: Sendable {
+    public let voltageMV: Int
+    public let currentMA: Int
+}
+
+// Charger / power-adapter identity from AppleSmartBattery.AdapterDetails.
+// Apple adapters report Name + Manufacturer; third-party PD chargers usually
+// only report a generic Description ("pd charger"). The UsbHvcMenu is the
+// adapter's full advertised voltage/current menu.
+public struct RawChargerIdentity: Sendable {
+    public let name: String
+    public let manufacturer: String
+    public let description: String
+    public let maxWatts: Int          // watts
+    public let pdos: [RawChargerPDO]
+}
+
 public enum PowerReader {
     public static func readAll() -> [RawPowerData] {
         var results: [RawPowerData] = []
@@ -106,6 +124,48 @@ public enum PowerReader {
                 systemCurrentIn: ioInt(telemetry["SystemCurrentIn"]),
                 isCharging: isCharging,
                 fullyCharged: fullyCharged
+            )
+        }
+
+        return result
+    }
+
+    // Read the active charger's identity and advertised power menu from
+    // AppleSmartBattery.AdapterDetails. Returns nil when no charger is
+    // connected or on Macs without a battery controller (desktops).
+    public static func readChargerIdentity() -> RawChargerIdentity? {
+        var result: RawChargerIdentity?
+
+        withMatchingServices(className: "AppleSmartBattery") { service in
+            guard let props = ioProperties(service) else { return }
+            guard ioBool(props["ExternalConnected"]) else { return }
+
+            let adapter = ioDictionary(props["AdapterDetails"])
+            guard !adapter.isEmpty else { return }
+
+            let name = ioString(adapter["Name"])
+            let description = ioString(adapter["Description"])
+            let manufacturer = ioString(adapter["Manufacturer"])
+            let watts = ioInt(adapter["Watts"])
+
+            var pdos: [RawChargerPDO] = []
+            for entry in ioArray(adapter["UsbHvcMenu"]) {
+                let dict = ioDictionary(entry)
+                let voltageMV = ioInt(dict["MaxVoltage"])
+                let currentMA = ioInt(dict["MaxCurrent"])
+                guard voltageMV > 0 else { continue }
+                pdos.append(RawChargerPDO(voltageMV: voltageMV, currentMA: currentMA))
+            }
+
+            // Nothing worth surfacing if we have neither a name nor a menu.
+            guard !name.isEmpty || !description.isEmpty || !pdos.isEmpty else { return }
+
+            result = RawChargerIdentity(
+                name: name,
+                manufacturer: manufacturer,
+                description: description,
+                maxWatts: watts,
+                pdos: pdos
             )
         }
 

@@ -20,6 +20,9 @@ public struct PortState: Identifiable, Sendable {
     public var ccConnected: Bool
     public var thunderboltLink: ThunderboltLinkState?
     public var power: PortPower?
+    // Identity of the charger supplying this port (incoming power only).
+    // Nil unless a charger is attached and AppleSmartBattery reports details.
+    public var charger: ChargerInfo?
     public var deviceName: String?
     public var usbSpeed: USBSpeed?
     public var usbDevice: USBDeviceInfo?
@@ -38,6 +41,12 @@ public struct PortState: Identifiable, Sendable {
     // Live transport state from IOPortTransportState* services.
     // One entry per active transport on this port (USB3, DP, CIO).
     public var liveTransports: [LiveTransport] = []
+
+    // What the port controller has actually set up on this connection, and
+    // anything macOS negotiated but then blocked. Nil on Macs without an HPM
+    // node (Intel, pre-M3, desktop front ports). The authoritative answer to
+    // "why doesn't my dock's USB / display work".
+    public var transports: PortTransports?
 
     // Display native resolution (from IOKit display data, if a display is connected)
     public var displayWidth: Int = 0
@@ -121,11 +130,16 @@ public struct PortHealth: Sendable, Equatable {
     public var connectionCount: Int
     public var authorizationStatus: String
     public var ldcmStatus: String
+    // Liquid detection (LDCM, M3+). liquidDetected is the definitive wet flag;
+    // mitigationsActive means macOS has restricted the port to limit damage.
+    public var liquidDetected: Bool
+    public var mitigationsActive: Bool
 
-    // .serious when overcurrents have been recorded.
+    // .serious when liquid has been detected or overcurrents recorded.
     // .warning when LDCM reports an error string.
     // .ok otherwise.
     public var severity: HealthSeverity {
+        if liquidDetected { return .serious }
         if overcurrentCount > 0 { return .serious }
         if !ldcmStatus.isEmpty && ldcmStatus != "No Error" { return .warning }
         return .ok
@@ -138,13 +152,17 @@ public struct PortHealth: Sendable, Equatable {
         plugEventCount: Int = 0,
         connectionCount: Int = 0,
         authorizationStatus: String = "",
-        ldcmStatus: String = ""
+        ldcmStatus: String = "",
+        liquidDetected: Bool = false,
+        mitigationsActive: Bool = false
     ) {
         self.overcurrentCount = overcurrentCount
         self.plugEventCount = plugEventCount
         self.connectionCount = connectionCount
         self.authorizationStatus = authorizationStatus
         self.ldcmStatus = ldcmStatus
+        self.liquidDetected = liquidDetected
+        self.mitigationsActive = mitigationsActive
     }
 }
 
@@ -309,6 +327,48 @@ public struct PortPower: Sendable, Equatable {
         self.configuredCurrent = configuredCurrent
         self.vconnCurrent = vconnCurrent
         self.direction = direction
+    }
+}
+
+// MARK: - Charger Identity
+
+// One advertised power option from the charger's USB-PD menu.
+public struct ChargerPDO: Sendable, Equatable {
+    public var voltageMV: Int
+    public var currentMA: Int
+
+    public var watts: Double { Double(voltageMV) * Double(currentMA) / 1_000_000.0 }
+
+    public init(voltageMV: Int, currentMA: Int) {
+        self.voltageMV = voltageMV
+        self.currentMA = currentMA
+    }
+}
+
+// Identity of the charger / power adapter currently supplying the Mac, from
+// AppleSmartBattery.AdapterDetails. Apple bricks report a full name and
+// manufacturer; third-party PD chargers usually only report a generic
+// description. `pdos` is the charger's full advertised menu, so we can show
+// "supports up to 100W" even when little is being drawn. Laptop-only (no
+// battery controller on desktops).
+public struct ChargerInfo: Sendable, Equatable {
+    public var name: String          // "96W USB-C Power Adapter" / "PD charger"
+    public var manufacturer: String  // "Apple Inc." or empty
+    public var maxWatts: Int         // watts (from AdapterDetails)
+    public var pdos: [ChargerPDO]    // advertised voltage/current menu
+
+    public var isApple: Bool { manufacturer.lowercased().contains("apple") }
+
+    public init(
+        name: String,
+        manufacturer: String = "",
+        maxWatts: Int = 0,
+        pdos: [ChargerPDO] = []
+    ) {
+        self.name = name
+        self.manufacturer = manufacturer
+        self.maxWatts = maxWatts
+        self.pdos = pdos
     }
 }
 
@@ -479,6 +539,15 @@ public struct LiveTransport: Sendable, Equatable {
     // device is authorised. Surface this so a blocked port is not mistaken
     // for a healthy one. USB only; always false for DP/Thunderbolt.
     public var restricted: Bool
+    // Number of displays driven over this link. DP only; 0 otherwise.
+    // More than one means a daisy-chained or MST-hub setup.
+    public var sinkCount: Int
+    // Identity of a DisplayPort branch device (MST hub or protocol converter)
+    // in the chain, e.g. "Dp1.2". Empty when the display connects directly.
+    public var branchDevice: String
+    // Downstream-facing port type when the chain converts to another standard,
+    // e.g. "HDMI". Empty for native DisplayPort. DP only.
+    public var dfpType: String
 
     public init(
         kind: LaneTransport,
@@ -487,7 +556,10 @@ public struct LiveTransport: Sendable, Equatable {
         laneCount: Int = 0,
         maxLaneCount: Int = 0,
         tunneled: Bool = false,
-        restricted: Bool = false
+        restricted: Bool = false,
+        sinkCount: Int = 0,
+        branchDevice: String = "",
+        dfpType: String = ""
     ) {
         self.kind = kind
         self.dataRate = dataRate
@@ -496,6 +568,43 @@ public struct LiveTransport: Sendable, Equatable {
         self.maxLaneCount = maxLaneCount
         self.tunneled = tunneled
         self.restricted = restricted
+        self.sinkCount = sinkCount
+        self.branchDevice = branchDevice
+        self.dfpType = dfpType
+    }
+}
+
+// MARK: - Port Transports
+
+// Which transports the port controller has provisioned (set up) for the
+// current connection, which it blocked, and - for a Thunderbolt/USB4 link -
+// which protocols are tunnelled over it.
+//
+// `provisioned` / `unauthorized` come from the HPM port controller (M3+).
+// `tunnelProvisioned` / `tunnelSupported` come from the CIO link (any TB link).
+// Transport names are IOKit's own strings, e.g. "USB2", "USB3", "DP",
+// "DisplayPort", "CIO", "PCIe".
+public struct PortTransports: Sendable, Equatable {
+    public var provisioned: [String]
+    public var unauthorized: [String]
+    public var tunnelProvisioned: [String]
+    public var tunnelSupported: [String]
+
+    // True when there is at least one transport fact worth showing.
+    public var hasData: Bool {
+        !provisioned.isEmpty || !unauthorized.isEmpty || !tunnelProvisioned.isEmpty
+    }
+
+    public init(
+        provisioned: [String] = [],
+        unauthorized: [String] = [],
+        tunnelProvisioned: [String] = [],
+        tunnelSupported: [String] = []
+    ) {
+        self.provisioned = provisioned
+        self.unauthorized = unauthorized
+        self.tunnelProvisioned = tunnelProvisioned
+        self.tunnelSupported = tunnelSupported
     }
 }
 

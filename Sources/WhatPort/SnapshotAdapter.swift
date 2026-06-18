@@ -17,7 +17,11 @@ enum SnapshotAdapter {
                     plugEventCount: hpm.plugEventCount,
                     connectionCount: hpm.connectionCount,
                     authorizationStatus: hpm.authorizationStatus,
-                    ldcmStatus: hpm.ldcmStatus
+                    ldcmStatus: hpm.ldcmStatus,
+                    provisionedTransports: hpm.provisionedTransports,
+                    unauthorizedTransports: hpm.unauthorizedTransports,
+                    liquidDetected: hpm.liquidDetected,
+                    mitigationsActive: hpm.mitigationsActive
                 )
             },
             phyData: snapshot.phyData.map { phy in
@@ -84,6 +88,15 @@ enum SnapshotAdapter {
                     fullyCharged: cp.fullyCharged
                 )
             },
+            chargerIdentity: snapshot.chargerIdentity.map { ci in
+                ChargerIdentityInput(
+                    name: ci.name,
+                    manufacturer: ci.manufacturer,
+                    description: ci.description,
+                    maxWatts: ci.maxWatts,
+                    pdos: ci.pdos.map { ChargerPDO(voltageMV: $0.voltageMV, currentMA: $0.currentMA) }
+                )
+            },
             deviceData: snapshot.deviceData.map { d in
                 DeviceInput(
                     portNumber: d.portNumber,
@@ -134,7 +147,9 @@ enum SnapshotAdapter {
                     laneCount: t.laneCount,
                     maxLaneCount: t.maxLaneCount,
                     tunneled: t.tunneled,
-                    sinkCount: t.sinkCount
+                    sinkCount: t.sinkCount,
+                    branchDevice: t.branchDevice,
+                    dfpType: t.dfpType
                 )
             },
             cioTransport: snapshot.cioTransport.map { t in
@@ -142,7 +157,11 @@ enum SnapshotAdapter {
                     portNumber: t.portNumber,
                     active: t.active,
                     dataRate: t.dataRate,
-                    tunneled: t.tunneled
+                    tunneled: t.tunneled,
+                    tunnelProvisioned: t.tunnelProvisioned,
+                    tunnelSupported: t.tunnelSupported,
+                    deviceModel: t.deviceModel,
+                    deviceVendor: t.deviceVendor
                 )
             },
             smcPortPower: snapshot.smcPortPower.map { s in

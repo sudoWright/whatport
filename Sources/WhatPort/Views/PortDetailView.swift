@@ -107,6 +107,7 @@ struct PortDetailView: View {
                     displayResolutionRow
                 }
             }
+            connectionsCard
             sectionCard { laneInfoSection }
             if let cap = port.thunderboltCapability {
                 sectionCard { thunderboltSection(capability: cap, link: port.thunderboltLink) }
@@ -130,6 +131,10 @@ struct PortDetailView: View {
                 // resolution still gets a card rather than floating loose.
                 sectionCard { displayResolutionRow }
             }
+            if let dp = dpTransport {
+                sectionCard { displaySection(dp) }
+            }
+            connectionsCard
             if let cap = port.thunderboltCapability {
                 sectionCard { thunderboltSection(capability: cap, link: port.thunderboltLink) }
             }
@@ -151,6 +156,10 @@ struct PortDetailView: View {
             } else if port.displayWidth > 0 && port.displayHeight > 0 {
                 sectionCard { displayResolutionRow }
             }
+            if let dp = dpTransport {
+                sectionCard { displaySection(dp) }
+            }
+            connectionsCard
             sectionCard { laneInfoSection }
             if let cap = port.thunderboltCapability {
                 sectionCard { thunderboltSection(capability: cap, link: port.thunderboltLink) }
@@ -164,6 +173,7 @@ struct PortDetailView: View {
             }
 
         case .idle:
+            connectionsCard
             sectionCard { laneInfoSection }
             if let cap = port.thunderboltCapability {
                 sectionCard { thunderboltSection(capability: cap, link: port.thunderboltLink) }
@@ -231,6 +241,121 @@ struct PortDetailView: View {
         }
     }
 
+    // The live DisplayPort link on this port, if a display is connected.
+    private var dpTransport: LiveTransport? {
+        port.liveTransports.first { $0.kind == .displayPort }
+    }
+
+    // Link-level display detail: how the picture actually gets to the screen.
+    // Answers "is my display running at full quality?" - link rate, lane
+    // allocation, native vs tunnelled, daisy-chained displays, and any
+    // converter chip (MST hub / HDMI) in the path.
+    @ViewBuilder
+    private func displaySection(_ dp: LiveTransport) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            sectionHeader("Display link")
+
+            HStack(spacing: 12) {
+                if !dp.dataRate.isEmpty {
+                    LabeledValue(label: "Link rate", value: dp.dataRate)
+                }
+                if dp.maxLaneCount > 0 {
+                    LabeledValue(label: "Lanes", value: "\(dp.laneCount) of \(dp.maxLaneCount)")
+                }
+                LabeledValue(
+                    label: "Connection",
+                    value: dp.tunneled ? "Tunnelled (Thunderbolt)" : "Native DP Alt Mode"
+                )
+            }
+
+            // Second row only renders when there is something extra to say
+            // (multiple displays, a converter, or an MST hub in the chain).
+            if dp.sinkCount > 1 || !dp.dfpType.isEmpty || !dp.branchDevice.isEmpty {
+                HStack(spacing: 12) {
+                    if dp.sinkCount > 1 {
+                        LabeledValue(label: "Displays", value: "\(dp.sinkCount)")
+                    }
+                    if !dp.dfpType.isEmpty {
+                        LabeledValue(label: "Converts to", value: dp.dfpType)
+                    }
+                    if !dp.branchDevice.isEmpty {
+                        LabeledValue(label: "Via", value: dp.branchDevice)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Connections (provisioned / blocked / tunnelled transports)
+
+    // Self-guarding card so each protocol case can include it with one line.
+    @ViewBuilder
+    private var connectionsCard: some View {
+        if let t = port.transports, t.hasData {
+            sectionCard { connectionsSection(t) }
+        }
+    }
+
+
+    // The authoritative "what is this port actually doing" summary, straight
+    // from the port controller. Surfaces a blocked transport (the usual cause
+    // of "my dock's USB doesn't work") that the lane bars alone can't explain.
+    private func connectionsSection(_ t: PortTransports) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionHeader("Connections")
+
+            if !t.provisioned.isEmpty {
+                transportChips(t.provisioned, color: .green)
+            }
+
+            if !t.tunnelProvisioned.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Tunnelled over Thunderbolt")
+                        .font(.footnote)
+                        .foregroundStyle(.tertiary)
+                    transportChips(t.tunnelProvisioned, color: .blue)
+                }
+            }
+
+            if !t.unauthorized.isEmpty {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.orange)
+                    Text("\(t.unauthorized.map(Self.transportLabel).joined(separator: ", ")) blocked by macOS. Approve the device in Settings \u{203A} Privacy & Security \u{203A} Allow accessories.")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+    }
+
+    private func transportChips(_ names: [String], color: Color) -> some View {
+        HStack(spacing: 6) {
+            ForEach(names, id: \.self) { name in
+                Text(Self.transportLabel(name))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(color)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(color.opacity(0.12), in: Capsule())
+            }
+        }
+    }
+
+    // Maps IOKit's terse transport names to friendly labels.
+    static func transportLabel(_ raw: String) -> String {
+        switch raw.uppercased() {
+        case "CC": return "Power"
+        case "USB2": return "USB 2.0"
+        case "USB3": return "USB 3"
+        case "DP", "DISPLAYPORT": return "DisplayPort"
+        case "CIO", "TBT", "THUNDERBOLT": return "Thunderbolt"
+        case "PCIE": return "PCIe"
+        default: return raw
+        }
+    }
+
     // MARK: - Lanes + Stats (combined)
 
     private var laneInfoSection: some View {
@@ -260,6 +385,11 @@ struct PortDetailView: View {
             if let health = port.health {
                 healthRow(health)
                     .padding(.top, 2)
+                if health.liquidDetected && health.mitigationsActive {
+                    Text("macOS has limited this port to prevent liquid damage. Disconnect and let it dry.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -336,6 +466,11 @@ struct PortDetailView: View {
                 && health.ldcmStatus != "No Error"
                 && health.ldcmStatus != acknowledged?.ldcmStatus
 
+            // Liquid is the most serious signal: a wet port can corrode, so it
+            // leads, in red, above any counter.
+            if health.liquidDetected {
+                return (.red, .red, "Liquid detected")
+            }
             if ldcmError {
                 return (.orange, .orange, health.ldcmStatus)
             }
@@ -361,6 +496,10 @@ struct PortDetailView: View {
     private var powerSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             sectionHeader("Power")
+
+            if let charger = port.charger {
+                chargerRow(charger)
+            }
 
             if let power = port.power {
                 HStack {
@@ -397,6 +536,46 @@ struct PortDetailView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    // Names the charger and shows its full advertised menu, so a 96W brick
+    // reads as 96W even when the battery is full and little is being drawn.
+    private func chargerRow(_ charger: ChargerInfo) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(charger.name)
+                    .font(.body.weight(.medium))
+                Spacer()
+                if !charger.manufacturer.isEmpty {
+                    Text(charger.manufacturer)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if let menu = chargerMenuSummary(charger) {
+                Text(menu)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    // "Supports up to 96 W (5 V · 9 V · 15 V · 20 V)". Falls back to just the
+    // wattage when no menu is advertised, or nil when there is nothing to show.
+    private func chargerMenuSummary(_ charger: ChargerInfo) -> String? {
+        let menuWatts = Int((charger.pdos.map(\.watts).max() ?? 0).rounded())
+        let watts = charger.maxWatts > 0 ? charger.maxWatts : menuWatts
+        let volts = charger.pdos
+            .map { $0.voltageMV }
+            .sorted()
+            .reduce(into: [Int]()) { unique, v in if !unique.contains(v) { unique.append(v) } }
+            .map { formatVolts($0) }
+
+        if volts.isEmpty {
+            return watts > 0 ? "Supports up to \(watts) W" : nil
+        }
+        let prefix = watts > 0 ? "Supports up to \(watts) W" : "Supports"
+        return "\(prefix) (\(volts.joined(separator: " \u{00B7} ")))"
     }
 
     // Converts millivolts to a human-readable volts string, e.g. 5234 -> "5.2 V", 5000 -> "5 V".
@@ -497,6 +676,11 @@ struct PortDetailView: View {
         VStack(alignment: .leading, spacing: 4) {
             sectionHeader("Thunderbolt")
 
+            // Name the connected device when its TB controller reports one.
+            if let link, let name = tbDeviceLabel(link) {
+                LabeledValue(label: "Connected", value: name)
+            }
+
             // Current negotiated link
             if let link {
                 let lanes = formatLanes(tx: link.txLanes, rx: link.rxLanes)
@@ -515,6 +699,15 @@ struct PortDetailView: View {
                 value: "Up to \(capability.maxGeneration.label), \(maxLanes) (\(capability.maxGeneration.perLaneGbps) Gbps/lane)"
             )
         }
+    }
+
+    // Combines TB vendor + model into a single label, e.g. "CalDigit TS3 Plus".
+    // Returns nil when neither is reported so the row is omitted.
+    private func tbDeviceLabel(_ link: ThunderboltLinkState) -> String? {
+        let vendor = link.deviceVendor ?? ""
+        let model = link.deviceName ?? ""
+        let combined = "\(vendor) \(model)".trimmingCharacters(in: .whitespaces)
+        return combined.isEmpty ? nil : combined
     }
 
     private func formatLanes(tx: Int, rx: Int) -> String {

@@ -43,6 +43,14 @@ func ioArray(_ value: Any?) -> [Any] {
     return []
 }
 
+// Reads an IOKit array of strings (e.g. TransportsProvisioned), dropping any
+// empty or non-string entries.
+func ioStringArray(_ value: Any?) -> [String] {
+    ioArray(value)
+        .map { ioString($0) }
+        .filter { !$0.isEmpty }
+}
+
 // Read all properties from an IOKit service as a Swift dictionary.
 //
 // IORegistryEntryCreateCFProperties fills an Unmanaged<CFMutableDictionary>.

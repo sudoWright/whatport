@@ -21,6 +21,7 @@ public struct PortSnapshot: Sendable {
     public let ccData: [RawCCData]
     public let chargerData: [RawChargerData]
     public let chargingPower: RawChargingPower?
+    public let chargerIdentity: RawChargerIdentity?
     public let deviceData: [RawDeviceInfo]
     public let displayData: [RawDisplayInfo]
     public let portStatsData: [RawPortStats]
@@ -41,6 +42,7 @@ public struct PortSnapshot: Sendable {
         ccData: [RawCCData] = [],
         chargerData: [RawChargerData] = [],
         chargingPower: RawChargingPower? = nil,
+        chargerIdentity: RawChargerIdentity? = nil,
         deviceData: [RawDeviceInfo] = [],
         displayData: [RawDisplayInfo] = [],
         portStatsData: [RawPortStats] = [],
@@ -58,6 +60,7 @@ public struct PortSnapshot: Sendable {
         self.ccData = ccData
         self.chargerData = chargerData
         self.chargingPower = chargingPower
+        self.chargerIdentity = chargerIdentity
         self.deviceData = deviceData
         self.displayData = displayData
         self.portStatsData = portStatsData
@@ -108,6 +111,7 @@ public enum SnapshotReader {
             ccData: CCReader.readAll(),
             chargerData: ChargerReader.readAll(),
             chargingPower: chargingPower,
+            chargerIdentity: PowerReader.readChargerIdentity(),
             deviceData: DeviceReader.readUSBDevices(),
             displayData: DisplayReader.readDisplays(),
             portStatsData: PortStatsReader.readAll(),
