@@ -3,6 +3,14 @@ import WhatPortCore
 import WhatPortAppKit
 
 struct PortListView: View {
+    // Compact base width. Widens with the font scale (only grows, never shrinks
+    // below 320) so larger text gets room to breathe instead of truncating
+    // sooner. AppDelegate uses the same formula for the popover's initial size.
+    static let baseWidth: CGFloat = 320
+    static func width(forScale scale: Double) -> CGFloat {
+        baseWidth * max(1, scale)
+    }
+
     var portManager: PortManager
     var footerContext: FooterContext
     @State private var selectedPortID: Int?
@@ -31,7 +39,7 @@ struct PortListView: View {
             }
         }
         .clipped()
-        .frame(width: 320)
+        .frame(width: Self.width(forScale: fontScale.fontSize))
         // macOS 26 (Tahoe) renders NSPopover with a very translucent Liquid
         // Glass material. On a dark desktop the content bleeds through and is
         // hard to read (issue #1). Back the content with a thick material so

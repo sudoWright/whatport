@@ -188,7 +188,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if popover == nil {
             let popover = NSPopover()
             popover.behavior = .transient
-            popover.contentSize = NSSize(width: 320, height: 560)
+            // Initial size only; the hosting controller resizes the popover to
+            // the SwiftUI content. Seed the width from the current font scale so
+            // it opens at the right width instead of flashing 320 then widening.
+            popover.contentSize = NSSize(
+                width: PortListView.width(forScale: FontScaleStore.shared.fontSize),
+                height: 560
+            )
             popover.contentViewController = NSHostingController(rootView: surfaceContent())
             popover.delegate = self
             self.popover = popover
