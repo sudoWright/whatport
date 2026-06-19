@@ -12,23 +12,27 @@ struct SettingsView: View {
     // live when it changes.
     @ObservedObject private var settings = AppSettings.shared
 
+    // Font-size multiplier for every panel. The slider below writes here and the
+    // panels read it through the fontScale environment, so text resizes live.
+    @ObservedObject private var fontScale = FontScaleStore.shared
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Settings
             VStack(alignment: .leading, spacing: 16) {
                 Text("Settings")
-                    .font(.title3.weight(.semibold))
+                    .scaledFont(.title3, weight: .semibold)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle("Launch at Login", isOn: $launchAtLogin)
                         .toggleStyle(.switch)
-                        .font(.body)
+                        .scaledFont(.body)
                         .onChange(of: launchAtLogin) { _, newValue in
                             setLaunchAtLogin(newValue)
                         }
 
                     Text("Keeps recording running, and restarts WhatPort if it's stopped unexpectedly (for example, when macOS quits it to free memory). A normal Quit still quits. Turn this off to stop it relaunching.")
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -36,10 +40,36 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle("Show in Dock", isOn: $settings.windowMode)
                         .toggleStyle(.switch)
-                        .font(.body)
+                        .scaledFont(.body)
 
                     Text("Runs WhatPort as a normal app with a Dock icon and a window, instead of living in the menu bar. Closing the window quits the app.")
-                        .font(.caption)
+                        .scaledFont(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Font size")
+                            .scaledFont(.body)
+                        Spacer()
+                        Text(verbatim: "\(Int((fontScale.fontSize * 100).rounded()))%")
+                            .scaledFont(.body)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 8) {
+                        Image(systemName: "textformat.size.smaller")
+                            .scaledFont(.body)
+                            .foregroundStyle(.secondary)
+                        Slider(value: $fontScale.fontSize, in: FontScaleStore.range, step: 0.1)
+                        Image(systemName: "textformat.size.larger")
+                            .scaledFont(.body)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text("Resizes text across every panel. Useful on high-resolution displays where the default text feels small.")
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -62,9 +92,9 @@ struct SettingsView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("WhatPort")
-                    .font(.subheadline.weight(.medium))
+                    .scaledFont(.subheadline, weight: .medium)
                 Text("Version \(appVersion)")
-                    .font(.footnote)
+                    .scaledFont(.footnote)
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 16)

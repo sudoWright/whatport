@@ -1,4 +1,5 @@
 import SwiftUI
+import WhatPortAppKit
 
 // Standalone "About WhatPort" card, shown in its own small window from the
 // menu-bar right-click menu. Mirrors the shape of a standard macOS About panel:
@@ -7,6 +8,10 @@ struct AboutView: View {
     // URLs also used by the right-click menu's "WhatPort on GitHub" item.
     static let gitHubURL = URL(string: "https://github.com/darrylmorley/whatport")!
     static let websiteURL = URL(string: "https://whatport.app")!
+
+    // Its own window, so it injects the font scale itself rather than inheriting
+    // it from the popover tree.
+    @ObservedObject private var fontScale = FontScaleStore.shared
 
     var body: some View {
         VStack(spacing: 12) {
@@ -18,14 +23,14 @@ struct AboutView: View {
 
             VStack(spacing: 3) {
                 Text("WhatPort")
-                    .font(.title2.weight(.semibold))
+                    .scaledFont(.title2, weight: .semibold)
                 Text("Version \(appVersion) (\(buildNumber))")
-                    .font(.subheadline)
+                    .scaledFont(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
             Text("Real-time USB-C port status for your Mac.")
-                .font(.body)
+                .scaledFont(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -34,14 +39,15 @@ struct AboutView: View {
                 Link("GitHub", destination: Self.gitHubURL)
                 Link("Website", destination: Self.websiteURL)
             }
-            .font(.body)
+            .scaledFont(.body)
 
             Text("\u{00A9} 2026 WhatPort")
-                .font(.footnote)
+                .scaledFont(.footnote)
                 .foregroundStyle(.tertiary)
         }
         .padding(24)
         .frame(width: 300)
+        .environment(\.fontScale, fontScale.fontSize)
     }
 
     private static var appIcon: NSImage? {

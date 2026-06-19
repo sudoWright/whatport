@@ -1,8 +1,10 @@
 import SwiftUI
 import Charts
 import WhatPortCore
+import WhatPortAppKit
 
 struct PortDetailView: View {
+    @Environment(\.fontScale) private var fontScale
     let port: PortState
     let powerHistory: [PowerSample]
     let powerMeteringAvailable: Bool
@@ -32,7 +34,7 @@ struct PortDetailView: View {
     private var portHeader: some View {
         HStack(alignment: .center) {
             Text(portName)
-                .font(.title3.weight(.semibold))
+                .scaledFont(.title3, weight: .semibold)
             Spacer()
             protocolChip
         }
@@ -48,7 +50,7 @@ struct PortDetailView: View {
     private var protocolChip: some View {
         let (label, color) = protocolChipInfo
         return Text(label)
-            .font(.caption.weight(.semibold))
+            .scaledFont(.caption, weight: .semibold)
             .foregroundStyle(color)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
@@ -70,7 +72,7 @@ struct PortDetailView: View {
     // Small-caps style section header: recedes so the values lead the eye.
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(.caption.weight(.semibold))
+            .scaledFont(.caption, weight: .semibold)
             .foregroundStyle(.secondary)
             .textCase(.uppercase)
     }
@@ -197,11 +199,11 @@ struct PortDetailView: View {
 
             HStack {
                 Text(device.productName)
-                    .font(.body.weight(.medium))
+                    .scaledFont(.body, weight: .medium)
                 Spacer()
                 if !device.vendorName.isEmpty {
                     Text(device.vendorName)
-                        .font(.subheadline)
+                        .scaledFont(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -221,10 +223,10 @@ struct PortDetailView: View {
             if let serial = device.serialNumber {
                 HStack {
                     Text("Serial")
-                        .font(.footnote)
+                        .scaledFont(.footnote)
                         .foregroundStyle(.tertiary)
                     Text(serial)
-                        .font(.system(size: 12, design: .monospaced))
+                        .scaledFont(size: 12, design: .monospaced)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -315,7 +317,7 @@ struct PortDetailView: View {
             if !t.tunnelProvisioned.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Tunnelled over Thunderbolt")
-                        .font(.footnote)
+                        .scaledFont(.footnote)
                         .foregroundStyle(.tertiary)
                     transportChips(t.tunnelProvisioned, color: .blue)
                 }
@@ -324,10 +326,10 @@ struct PortDetailView: View {
             if !t.unauthorized.isEmpty {
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 11, weight: .medium))
+                        .scaledFont(size: 11, weight: .medium)
                         .foregroundStyle(.orange)
                     Text("\(t.unauthorized.map(Self.transportLabel).joined(separator: ", ")) blocked by macOS. Approve the device in Settings \u{203A} Privacy & Security \u{203A} Allow accessories.")
-                        .font(.footnote)
+                        .scaledFont(.footnote)
                         .foregroundStyle(.orange)
                 }
             }
@@ -338,7 +340,7 @@ struct PortDetailView: View {
         HStack(spacing: 6) {
             ForEach(names, id: \.self) { name in
                 Text(Self.transportLabel(name))
-                    .font(.caption.weight(.medium))
+                    .scaledFont(.caption, weight: .medium)
                     .foregroundStyle(color)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2)
@@ -393,7 +395,7 @@ struct PortDetailView: View {
                     Text(health.mitigationsActive
                         ? "macOS has limited this port to prevent liquid damage. Disconnect and let it dry."
                         : "Liquid detected on this port. Disconnect and let it dry.")
-                        .font(.footnote)
+                        .scaledFont(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -410,16 +412,16 @@ struct PortDetailView: View {
 
         return HStack(spacing: 4) {
             Text("Lifetime:")
-                .font(.footnote)
+                .scaledFont(.footnote)
                 .foregroundStyle(.tertiary)
             Text("\(stats.connectCount) connections")
-                .font(.footnote)
+                .scaledFont(.footnote)
                 .foregroundStyle(.secondary)
             Text("\u{00B7}")
-                .font(.footnote)
+                .scaledFont(.footnote)
                 .foregroundStyle(.tertiary)
             Text(errorSummary(stats, total: errorCount))
-                .font(.footnote)
+                .scaledFont(.footnote)
                 .foregroundColor(errorCount > 0 ? .orange : .gray)
         }
     }
@@ -445,7 +447,7 @@ struct PortDetailView: View {
     private func healthRow(_ health: PortHealth) -> some View {
         HStack(spacing: 6) {
             Text("Port health:")
-                .font(.footnote)
+                .scaledFont(.footnote)
                 .foregroundStyle(.tertiary)
             healthBadge(health)
         }
@@ -490,7 +492,7 @@ struct PortDetailView: View {
         }()
 
         Text(label)
-            .font(.footnote.weight(.medium))
+            .scaledFont(.footnote, weight: .medium)
             .foregroundStyle(textColor)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
@@ -520,9 +522,9 @@ struct PortDetailView: View {
             if let power = port.power {
                 HStack {
                     Text(WattsFormat.string(power.watts))
-                        .font(.system(.title2, design: .rounded, weight: .semibold))
+                        .scaledFont(.title2, design: .rounded, weight: .semibold)
                     Text("(\(formatAmps(power.current)) at \(formatVolts(power.voltage)))")
-                        .font(.subheadline)
+                        .scaledFont(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 HStack(spacing: 12) {
@@ -549,11 +551,11 @@ struct PortDetailView: View {
                 EmptyView()
             } else if !powerMeteringAvailable {
                 Text("Per-port power metering not reported on this Mac")
-                    .font(.subheadline)
+                    .scaledFont(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
                 Text("Not sourcing power")
-                    .font(.subheadline)
+                    .scaledFont(.subheadline)
                     .foregroundStyle(.secondary)
             }
         }
@@ -566,10 +568,10 @@ struct PortDetailView: View {
     private func chargingStatusRow(_ status: ChargingStatus) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Status")
-                .font(.footnote)
+                .scaledFont(.footnote)
                 .foregroundStyle(.secondary)
             Text(chargingStatusText(status))
-                .font(.subheadline.weight(.medium))
+                .scaledFont(.subheadline, weight: .medium)
                 .foregroundStyle(chargingStatusColor(status))
         }
     }
@@ -597,17 +599,17 @@ struct PortDetailView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(charger.name)
-                    .font(.body.weight(.medium))
+                    .scaledFont(.body, weight: .medium)
                 Spacer()
                 if !charger.manufacturer.isEmpty {
                     Text(charger.manufacturer)
-                        .font(.subheadline)
+                        .scaledFont(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
             if let menu = chargerMenuSummary(charger) {
                 Text(menu)
-                    .font(.footnote)
+                    .scaledFont(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
@@ -704,16 +706,20 @@ struct PortDetailView: View {
                     AxisValueLabel {
                         if let w = value.as(Double.self) {
                             Text(String(format: fmt, w))
-                                .font(.system(size: 12))
+                                .scaledFont(size: 12)
                         }
                     }
                 }
             }
-            .frame(height: 40)
+            // Grow the plot with the font scale so the three Y-axis labels keep
+            // their spacing instead of overlapping (or Charts dropping a tick) at
+            // larger sizes. Only grow, never shrink: the tick count is fixed at 3,
+            // so a shorter plot at sub-1.0 scales would crowd them.
+            .frame(height: 40 * max(1, fontScale))
             .overlay {
                 if !port.isActive && !powerHistory.isEmpty {
                     Text("disconnected")
-                        .font(.footnote)
+                        .scaledFont(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -789,6 +795,7 @@ struct PortDetailView: View {
 // MARK: - Lane Bar
 
 struct LaneBar: View {
+    @Environment(\.fontScale) private var fontScale
     let label: String
     let state: LaneState
     let tbLink: ThunderboltLinkState?
@@ -822,26 +829,26 @@ struct LaneBar: View {
                 .frame(width: 6, height: 6)
 
             Text(label)
-                .font(.system(size: 12, design: .monospaced))
+                .scaledFont(size: 12, design: .monospaced)
                 .foregroundStyle(.secondary)
-                .frame(width: 54, alignment: .trailing)
+                .frame(width: 54 * fontScale, alignment: .trailing)
 
             RoundedRectangle(cornerRadius: 5)
                 .fill(barFill)
-                .frame(height: 22)
+                .frame(height: 22 * fontScale)
                 .overlay {
                     HStack(spacing: 4) {
                         if isRestricted {
                             Image(systemName: "lock.fill")
-                                .font(.system(size: 10, weight: .medium))
+                                .scaledFont(size: 10, weight: .medium)
                                 .foregroundStyle(barTextColor)
                         }
                         Text(barLabel)
-                            .font(.system(size: 12, weight: .medium))
+                            .scaledFont(size: 12, weight: .medium)
                             .foregroundStyle(barTextColor)
                         if let lt = liveTransport, lt.tunneled {
                             Text("tunnel")
-                                .font(.system(size: 12, weight: .medium))
+                                .scaledFont(size: 12, weight: .medium)
                                 .foregroundStyle(barTextColor.opacity(0.5))
                         }
                     }
@@ -936,23 +943,24 @@ struct LaneBar: View {
 }
 
 struct USB2Bar: View {
+    @Environment(\.fontScale) private var fontScale
     let active: Bool
 
     var body: some View {
         HStack(spacing: 6) {
             Color.clear.frame(width: 6, height: 6)
             Text("USB2")
-                .font(.system(size: 12, design: .monospaced))
+                .scaledFont(size: 12, design: .monospaced)
                 .foregroundStyle(.secondary)
-                .frame(width: 54, alignment: .trailing)
+                .frame(width: 54 * fontScale, alignment: .trailing)
 
             RoundedRectangle(cornerRadius: 5)
                 .fill(active ? Color.green.opacity(0.12) : Color.primary.opacity(0.04))
-                .frame(height: 22)
+                .frame(height: 22 * fontScale)
                 .overlay {
                     if active {
                         Text("480 Mbps")
-                            .font(.system(size: 12, weight: .medium))
+                            .scaledFont(size: 12, weight: .medium)
                             .foregroundStyle(.green)
                     }
                 }
@@ -969,10 +977,10 @@ struct LabeledValue: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.footnote)
+                .scaledFont(.footnote)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.subheadline.weight(.medium))
+                .scaledFont(.subheadline, weight: .medium)
                 .foregroundStyle(.primary)
         }
     }

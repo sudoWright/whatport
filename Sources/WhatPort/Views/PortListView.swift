@@ -9,6 +9,10 @@ struct PortListView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    // Observed here so changing the slider re-renders this root and pushes the
+    // new multiplier down through the whole popover/window tree via .environment.
+    @ObservedObject private var fontScale = FontScaleStore.shared
+
     var body: some View {
         VStack(spacing: 0) {
             if let panelIndex = footerContext.showingPanelIndex {
@@ -33,6 +37,7 @@ struct PortListView: View {
         // hard to read (issue #1). Back the content with a thick material so
         // text stays legible while keeping a subtle frosted look.
         .background(.thickMaterial)
+        .environment(\.fontScale, fontScale.fontSize)
     }
 
     // Push-style navigation: panels slide in from an edge with a fade, like a
@@ -84,16 +89,16 @@ struct PortListView: View {
     private var header: some View {
         HStack(alignment: .center) {
             Text("Ports")
-                .font(.title3.weight(.semibold))
+                .scaledFont(.title3, weight: .semibold)
             Spacer()
             if portManager.portCount > 0 {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("\(portManager.activePortCount)/\(portManager.portCount) active")
-                        .font(.subheadline)
+                        .scaledFont(.subheadline)
                         .foregroundStyle(.secondary)
                     if !headerPowerLabel.isEmpty {
                         Text(headerPowerLabel)
-                            .font(.footnote)
+                            .scaledFont(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -124,10 +129,10 @@ struct PortListView: View {
     private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "bolt.horizontal")
-                .font(.title2)
+                .scaledFont(.title2)
                 .foregroundStyle(.tertiary)
             Text("Scanning ports\u{2026}")
-                .font(.body)
+                .scaledFont(.body)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -159,7 +164,7 @@ struct PortListView: View {
                 NSApplication.shared.terminate(nil)
             } label: {
                 Text("Quit")
-                    .font(.body)
+                    .scaledFont(.body)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
@@ -179,7 +184,7 @@ struct PortListView: View {
                 }
             } label: {
                 Image(systemName: "gear")
-                    .font(.body)
+                    .scaledFont(.body)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
@@ -202,7 +207,7 @@ struct PortListView: View {
                         Image(systemName: "chevron.left")
                         Text("Back")
                     }
-                    .font(.body)
+                    .scaledFont(.body)
                     .frame(minHeight: 32)
                 }
                 .buttonStyle(.plain)
@@ -240,7 +245,7 @@ struct PortListView: View {
                         Image(systemName: "chevron.left")
                         Text("Back")
                     }
-                    .font(.body)
+                    .scaledFont(.body)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
@@ -288,31 +293,31 @@ struct PortRowView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
                     Text(titleText)
-                        .font(.body.weight(.semibold))
+                        .scaledFont(.body, weight: .semibold)
                         .foregroundStyle(port.isActive ? .primary : .secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                     // Show port number next to device name so you know which port
                     if port.deviceName != nil && port.isActive {
                         Text(portLabel)
-                            .font(.footnote)
+                            .scaledFont(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }
                 Text(summaryText)
-                    .font(.subheadline)
+                    .scaledFont(.subheadline)
                     .foregroundStyle(port.isActive ? .secondary : .tertiary)
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
             if let power = port.power {
                 Text(WattsFormat.string(power.watts))
-                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .scaledFont(.body, design: .rounded, weight: .semibold)
                     .monospacedDigit()
                     .foregroundStyle(.primary)
             }
             Image(systemName: "chevron.right")
-                .font(.caption)
+                .scaledFont(.caption)
                 .foregroundStyle(isHovered ? .tertiary : .quaternary)
         }
         .padding(.horizontal, 12)
