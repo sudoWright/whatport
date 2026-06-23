@@ -92,6 +92,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             registerForWake()
         }
 
+        // Start polling GitHub releases for a newer version (a silent check now,
+        // then every 6h). Surfaces an in-popover banner when one is available;
+        // the right-click "Check for Updates…" item triggers a manual,
+        // alert-backed check.
+        UpdateChecker.shared.start()
+
         // Menu-bar vs window/Dock mode. The toggle in Settings writes
         // AppSettings.windowMode; we apply the current value now and live-switch
         // whenever it changes.
@@ -326,6 +332,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Settings\u{2026}", action: #selector(openSettings), keyEquivalent: ",").target = self
+        menu.addItem(withTitle: "Check for Updates\u{2026}", action: #selector(checkForUpdates), keyEquivalent: "").target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "WhatPort on GitHub", action: #selector(openGitHub), keyEquivalent: "").target = self
         menu.addItem(withTitle: "About WhatPort", action: #selector(openAbout), keyEquivalent: "").target = self
@@ -346,6 +353,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     @objc private func openGitHub() {
         NSWorkspace.shared.open(AboutView.gitHubURL)
+    }
+
+    @objc private func checkForUpdates() {
+        UpdateChecker.shared.check(silent: false)
     }
 
     @objc private func quitApp() {

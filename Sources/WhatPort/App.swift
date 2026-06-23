@@ -31,6 +31,15 @@ struct WhatPortApp: App {
                     }
                     .keyboardShortcut(",", modifiers: .command)
                 }
+                // Manual update check. This app menu only shows in window/Dock
+                // mode; in menu-bar mode the same action lives on the status
+                // item's right-click menu (AppDelegate), so both modes can
+                // trigger a check.
+                CommandGroup(after: .appInfo) {
+                    Button("Check for Updates\u{2026}") {
+                        UpdateChecker.shared.check(silent: false)
+                    }
+                }
             }
     }
 }

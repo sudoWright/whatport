@@ -21,6 +21,9 @@ struct PortListView: View {
     // new multiplier down through the whole popover/window tree via .environment.
     @ObservedObject private var fontScale = FontScaleStore.shared
 
+    // Drives the "update available" banner at the top of the list.
+    @ObservedObject private var updates = UpdateChecker.shared
+
     var body: some View {
         VStack(spacing: 0) {
             if let panelIndex = footerContext.showingPanelIndex {
@@ -79,6 +82,11 @@ struct PortListView: View {
         VStack(spacing: 0) {
             header
             Divider()
+
+            if let update = updates.available {
+                UpdateBanner(update: update)
+                Divider()
+            }
 
             if portManager.ports.isEmpty {
                 emptyState
