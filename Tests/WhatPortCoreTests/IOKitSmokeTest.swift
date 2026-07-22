@@ -19,8 +19,24 @@ import Testing
     let ports = ThunderboltReader.readAll()
     #expect(!ports.isEmpty, "Expected at least one IOThunderboltPort with Socket ID")
 
-    for port in ports {
-        #expect(!port.socketID.isEmpty, "Socket ID should not be empty")
+    // Only the host controller's own ports carry a Socket ID. Attaching a
+    // Thunderbolt device adds a downstream switch whose "Thunderbolt Port"
+    // adapters have none, so requiring one on every adapter would fail
+    // whenever a dock or display is plugged in. PortManager.bestTBPerSocket
+    // already skips socket-less adapters; the host ports are what must be
+    // present and well-formed.
+    // Known gap: this can't catch a reader regression that drops the Socket ID
+    // from only some host ports. Cross-checking against HPMReader's roster
+    // wouldn't be safe either, since not every USB-C port is a Thunderbolt one
+    // (Mac mini front ports are USB-only). Catching that needs replayed
+    // multi-machine fixtures, not a smoke test on whatever Mac runs the suite.
+    let socketIDs = ports.map(\.socketID).filter { !$0.isEmpty }
+    #expect(!socketIDs.isEmpty, "Expected at least one host port carrying a Socket ID")
+
+    for socketID in socketIDs {
+        let parsed = Int(socketID)
+        #expect(parsed != nil, "Socket ID should parse as an Int, got \(socketID)")
+        #expect((parsed ?? 0) > 0, "Socket ID should be a positive physical port number")
     }
 }
 

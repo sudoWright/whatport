@@ -111,6 +111,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 self?.applyDisplayMode(windowMode: windowMode)
             }
             .store(in: &cancellables)
+
+        // The port-count badge only redraws on a port snapshot (once a second),
+        // so redraw it on toggle too and the change lands immediately.
+        AppSettings.shared.$showPortCount
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateBadge()
+            }
+            .store(in: &cancellables)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -265,6 +276,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         guard let button = statusItem?.button else { return }
         let active = portManager.activePortCount
         let total = portManager.portCount
+
+        // VoiceOver reads the title, so with the count hidden the status item
+        // would be an unlabelled image. Label it explicitly either way.
+        button.setAccessibilityLabel(
+            total > 0 ? "WhatPort, \(active) of \(total) ports active" : "WhatPort"
+        )
+
+        guard AppSettings.shared.showPortCount else {
+            button.title = ""
+            return
+        }
 
         if total > 0 {
             button.title = " \(active)/\(total)"

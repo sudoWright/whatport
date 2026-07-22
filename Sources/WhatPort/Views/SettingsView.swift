@@ -48,6 +48,21 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
+                VStack(alignment: .leading, spacing: 4) {
+                    // Disabled in window mode: there is no menu bar item to badge.
+                    // macOS dims a disabled control's own label, so no manual
+                    // opacity here (that would double-dim the caption below).
+                    Toggle("Show port count in menu bar", isOn: $settings.showPortCount)
+                        .toggleStyle(.switch)
+                        .scaledFont(.body)
+                        .disabled(settings.windowMode)
+
+                    Text("Shows the active/total port count next to the menu bar icon. Turn it off for an icon only.")
+                        .scaledFont(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("Font size")

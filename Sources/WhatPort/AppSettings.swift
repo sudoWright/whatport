@@ -13,6 +13,7 @@ final class AppSettings: ObservableObject {
 
     private enum Keys {
         static let windowMode = "app.whatport.windowMode"
+        static let showPortCount = "app.whatport.showPortCount"
     }
 
     // When true, WhatPort runs as a regular Dock app with a window. When false
@@ -24,9 +25,21 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    // When true (the default), the menu bar item shows the "active/total" port
+    // count next to the icon. When false, the icon stands alone.
+    @Published var showPortCount: Bool {
+        didSet {
+            guard showPortCount != oldValue else { return }
+            UserDefaults.standard.set(showPortCount, forKey: Keys.showPortCount)
+        }
+    }
+
     private init() {
         // Absent key -> menu-bar mode. Explicit so the default doesn't silently
         // ride on bool(forKey:) returning false for a missing key.
         windowMode = UserDefaults.standard.object(forKey: Keys.windowMode) as? Bool ?? false
+        // Absent key -> count shown, matching every release before this setting
+        // existed. bool(forKey:) would default it to hidden.
+        showPortCount = UserDefaults.standard.object(forKey: Keys.showPortCount) as? Bool ?? true
     }
 }
