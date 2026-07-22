@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var dataTask: Task<Void, Never>?
     private var isSupported = true
     private var cancellables = Set<AnyCancellable>()
+    private var statusItemMoveObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Single-instance guard. If another instance of this bundle is already
@@ -199,6 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             }
             statusItem = item
+            observeStatusItemMoves(window: item.button?.window)
             updateBadge()
         }
 
@@ -221,6 +223,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func tearDownMenuBar() {
         if let popover, popover.isShown { popover.performClose(nil) }
         popover = nil
+        stopObservingStatusItemMoves()
         if let statusItem {
             NSStatusBar.system.removeStatusItem(statusItem)
         }
@@ -293,6 +296,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         } else {
             button.title = ""
         }
+    }
+
+    // Changing the title resizes the status item, and macOS then re-lays-out the
+    // menu bar, sliding the item to its final spot a fraction of a second later.
+    // An open popover keeps the anchor it was shown with, so it ends up beside
+    // the icon instead of under it. Re-point it whenever the item's window
+    // actually moves: that covers the port count being hidden or shown (the
+    // toggle lives in the popover), the count changing width ("9/10" to "10/10"),
+    // and any neighbouring menu bar item shifting ours along.
+    private func observeStatusItemMoves(window: NSWindow?) {
+        guard let window else { return }
+        stopObservingStatusItemMoves()
+        statusItemMoveObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didMoveNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.reanchorPopover() }
+        }
+    }
+
+    private func stopObservingStatusItemMoves() {
+        guard let statusItemMoveObserver else { return }
+        NotificationCenter.default.removeObserver(statusItemMoveObserver)
+        self.statusItemMoveObserver = nil
+    }
+
+    private func reanchorPopover() {
+        guard let popover, popover.isShown, let button = statusItem?.button else { return }
+        popover.positioningRect = button.bounds
     }
 
     private func registerForWake() {
