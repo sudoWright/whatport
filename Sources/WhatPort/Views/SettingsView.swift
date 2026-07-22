@@ -62,6 +62,9 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                // On the row, not the Toggle: a disabled control is a shaky place
+                // to hang a tooltip, and the row is what the user hovers.
+                .help(settings.windowMode ? "Only applies in menu bar mode." : "")
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
